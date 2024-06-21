@@ -418,7 +418,9 @@ pub struct VectorFunction2D {
     pub f1:Box<dyn Fn(f64, f64) -> f64>,
     pub expression_f1:String,
     pub f2:Box<dyn Fn(f64, f64) -> f64>,
-    pub expression_f2:String
+    pub expression_f2:String,
+    pub potential: Option<Function>,
+    pub potential_expression: String
 }
 pub struct VectorFunction3D {
     pub f1:Box<dyn Fn(f64, f64, f64) -> f64>,
@@ -426,11 +428,31 @@ pub struct VectorFunction3D {
     pub f2:Box<dyn Fn(f64, f64, f64) -> f64>,
     pub expression_f2:String,
     pub f3:Box<dyn Fn(f64, f64, f64) -> f64>,
-    pub expression_f3:String
+    pub expression_f3:String,
+    pub potential: Option<Function>,
+    pub potential_expression: String
 }
 pub enum VectorFunction {
     TwoD(VectorFunction2D),
     ThreeD(VectorFunction3D)
+}
+impl VectorFunction {
+    fn potential(&self, args:Vec<f64>) -> f64 {
+        match self {
+            VectorFunction::TwoD(v) => if let Some(f) = &v.potential {
+                return f(args[0], args[1])
+            } else {f64::NAN},
+            VectorFunction::ThreeD(v) => if let Some(f) = &v.potential {
+                return f(args[0],args[1], args[2])
+            } else {f64::NAN}
+        }
+    }
+    pub fn expression(&self) -> String {
+        match self {
+            VectorFunction::TwoD(v) => v.clone().potential_expression.clone(),
+            VectorFunction::ThreeD(v) => v.clone().potential_expression.clone()
+        }
+    }
 }
 impl Display for VectorFunction {
     fn fmt(&self, f: &mut Formatter<'_>) -> std::fmt::Result {
@@ -451,7 +473,9 @@ macro_rules! vector_function {
             f1: Box::new(|$x:f64, $y:f64| $f1),
             expression_f1: String::from(stringify!($f1)),
             f2: Box::new(|$x:f64, $y:f64| $f2),
-            expression_f2: String::from(stringify!($f2))
+            expression_f2: String::from(stringify!($f2)),
+            potential: Option::None,
+            potential_expression: String::from("")
         })
     };
     ($x:ident, $y:ident, $z:ident, $f1:expr, $f2:expr, $f3:expr) => {
@@ -461,7 +485,9 @@ macro_rules! vector_function {
             f2: Box::new(|$x:f64, $y:f64, $z:f64| $f2),
             expression_f2: String::from(stringify!($f2)),
             f3: Box::new(|$x:f64, $y:f64, $z:f64| $f3),
-            expression_f3: String::from(stringify!($f3))
+            expression_f3: String::from(stringify!($f3)),
+            potential: Option::None,
+            potential_expression: String::from("")
         })
     };
 }
@@ -616,8 +642,10 @@ pub fn grad(f:&Function) -> VectorFunction {
             VectorFunction::TwoD(VectorFunction2D {
                 expression_f1: format!("ddx({})", f.expression()),
                 expression_f2: format!("ddy({})", f.expression()),
+                potential_expression: f.expression(),
                 f1: Box::new(move |x:f64, y:f64| ddx_s(&f1, vec![x, y])),
-                f2: Box::new(move |x:f64, y:f64| ddy_s(&f2, vec![x, y]))
+                f2: Box::new(move |x:f64, y:f64| ddy_s(&f2, vec![x, y])),
+                potential: Some(f.clone()),
             })
         }
         Function::ThreeD(_) => {
@@ -628,9 +656,11 @@ pub fn grad(f:&Function) -> VectorFunction {
                 expression_f1: format!("ddx({})", f.expression()),
                 expression_f2: format!("ddy({})", f.expression()),
                 expression_f3: format!("ddz({})", f.expression()),
+                potential_expression: f.expression(),
                 f1: Box::new(move |x:f64, y:f64, z:f64| ddx_s(&f1, vec![x, y, z])),
                 f2: Box::new(move |x:f64, y:f64, z:f64| ddy_s(&f2, vec![x, y, z])),
                 f3: Box::new(move |x:f64, y:f64, z:f64| ddz_s(&f3, vec![x, y, z])),
+                potential: Some(f.clone()),
             })
         }
     }
@@ -686,6 +716,7 @@ mod tests {
 
         let g = f!(x, y, z, x + y +z);
         let del_g = grad!(g);
-        println!("∇g(1, 2, 3) = {}", del_g(1., 2., 3.))
+        println!("∇g(1, 2, 3) = {}", del_g(1., 2., 3.));
+        //assert_eq!(del_g.potential(vec![1., 2., 3.]), g(1., 2., 3.));
     }
 }
