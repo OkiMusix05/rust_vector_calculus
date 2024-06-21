@@ -1,0 +1,797 @@
+#![feature(unboxed_closures, fn_traits)]
+
+use std::fmt::{Display, Formatter};
+use dyn_clone::DynClone;
+
+// DECLARATIONS & TYPES
+// Global Delta
+const Δ:f64 = 5e-6;
+#[derive(Copy, Clone)]
+pub struct Vector2D {
+    pub x:f64,
+    pub y:f64
+}
+#[derive(Copy, Clone)]
+pub struct Vector3D {
+    pub x:f64,
+    pub y:f64,
+    pub z:f64
+}
+impl Vector2D {
+    pub fn new(x:f64, y:f64) -> Self {
+        Self { x, y }
+    }
+    pub fn get_tuple(&self) -> (f64, f64) {
+        (self.x, self.y)
+    }
+}
+impl Vector3D {
+    pub fn new(x:f64, y:f64, z:f64) -> Self {
+        Self { x, y, z}
+    }
+    pub fn get_tuple(&self) -> (f64, f64, f64) {
+        (self.x, self.y, self.z)
+    }
+}
+// Dot product
+impl std::ops::Mul for Vector2D {
+    type Output = f64;
+
+    fn mul(self, other: Self) -> Self::Output {
+        self.x * other.x + self.y * other.y
+    }
+}
+impl std::ops::Mul for Vector3D {
+    type Output = f64;
+    fn mul(self, rhs: Self) -> Self::Output {
+        self.x*rhs.x + self.y*rhs.y + self.z*rhs.z
+    }
+}
+// Cross product
+impl std::ops::Rem for Vector2D {
+    type Output = f64;
+    fn rem(self, rhs: Self) -> Self::Output {
+        self.x*rhs.y - self.y*rhs.x
+    }
+}
+impl std::ops::Rem for Vector3D {
+    type Output = Vector3D;
+    fn rem(self, rhs: Self) -> Self::Output {
+        Vector3D {
+            x: self.y*rhs.z - self.z*rhs.y,
+            y: self.z*rhs.x - self.x*rhs.z,
+            z: self.x*rhs.y - self.y*rhs.x,
+        }
+    }
+}
+impl Display for Vector2D {
+    fn fmt(&self, f: &mut Formatter<'_>) -> std::fmt::Result {
+        write!(f, "⟨{:.5}, {:.5}⟩", self.x, self.y)
+    }
+}
+impl Display for Vector3D {
+    fn fmt(&self, f: &mut Formatter<'_>) -> std::fmt::Result {
+        write!(f, "⟨{:.5}, {:.5}, {:.5}⟩", self.x, self.y, self.z)
+    }
+}
+// Scalar Functions
+pub trait F2DClone: DynClone + Fn(f64, f64) -> f64 {
+    fn call(&self, x: f64, y: f64) -> f64;
+}
+pub trait F3DClone: DynClone + Fn(f64, f64, f64) -> f64 {
+    fn call(&self, x: f64, y: f64, z:f64) -> f64;
+}
+impl<F> F2DClone for F
+    where
+        F: 'static + Fn(f64, f64) -> f64 + Clone,
+{
+    fn call(&self, x: f64, y: f64) -> f64 {
+        self(x, y)
+    }
+}
+impl<F> F3DClone for F
+    where F: 'static + Fn(f64, f64, f64) -> f64 + Clone
+{
+    fn call(&self, x: f64, y: f64, z:f64) -> f64 {
+        self(x, y, z)
+    }
+}
+dyn_clone::clone_trait_object!(F2DClone<Output=f64>);
+dyn_clone::clone_trait_object!(F3DClone<Output=f64>);
+
+pub struct Function2D {
+    pub f:Box<dyn F2DClone<Output=f64>>,
+    pub expression:String
+}
+pub struct Function3D {
+    pub f:Box<dyn F3DClone<Output=f64>>,
+    pub expression:String
+}
+impl Clone for Function2D {
+    fn clone(&self) -> Function2D {
+        Function2D {
+            f: dyn_clone::clone_box(&*self.f),
+            expression: String::from(&*self.expression)
+        }
+    }
+}
+impl Clone for Function3D {
+    fn clone(&self) -> Function3D {
+        Function3D {
+            f: dyn_clone::clone_box(&*self.f),
+            expression: String::from(&*self.expression)
+        }
+    }
+}
+#[macro_export]
+macro_rules! fxy {
+    ($x:ident, $y:ident, $f:expr) => {
+        Function2D {
+            f: Box::new(|$x:f64, $y:f64| $f),
+            expression: String::from(stringify!($f))
+        }
+    };
+}
+#[macro_export]
+macro_rules! fxyz {
+    ($x:ident, $y:ident, $z:ident, $f:expr) => {
+        Function3D {
+            f: Box::new(|$x:f64, $y:f64, $z:f64| $f),
+            expression: String::from(stringify!($f))
+        }
+    };
+}
+impl Fn<(f64, f64)> for Function2D {
+    extern "rust-call" fn call(&self, args: (f64, f64)) -> Self::Output {
+        (self.f)(args.0, args.1)
+    }
+}
+impl FnMut<(f64, f64)> for Function2D {
+    extern "rust-call" fn call_mut(&mut self, args: (f64, f64)) -> Self::Output {
+        (self.f)(args.0, args.1)
+    }
+}
+impl FnOnce<(f64, f64)> for Function2D {
+    type Output = f64;
+
+    extern "rust-call" fn call_once(self, args: (f64, f64)) -> Self::Output {
+        (self.f)(args.0, args.1)
+    }
+}
+impl Fn<(f64, f64, f64)> for Function3D {
+    extern "rust-call" fn call(&self, args: (f64, f64, f64)) -> Self::Output {
+        (self.f)(args.0, args.1, args.2)
+    }
+}
+impl FnMut<(f64, f64, f64)> for Function3D {
+    extern "rust-call" fn call_mut(&mut self, args: (f64, f64, f64)) -> Self::Output {
+        (self.f)(args.0, args.1, args.2)
+    }
+}
+impl FnOnce<(f64, f64, f64)> for Function3D {
+    type Output = f64;
+
+    extern "rust-call" fn call_once(self, args: (f64, f64, f64)) -> Self::Output {
+        (self.f)(args.0, args.1, args.2)
+    }
+}
+impl Function2D {
+    pub fn ddx(&self, x:f64, y:f64) -> f64 {
+        ((self.f)(x + Δ, y)-(self.f)(x, y))/Δ
+    }
+    pub fn ddy(&self, x:f64, y:f64) -> f64 {
+        ((self.f)(x, y + Δ)-(self.f)(x, y))/Δ
+    }
+}
+impl Function3D {
+    pub fn ddx(&self, x:f64, y:f64, z:f64) -> f64 {
+        ((self.f)(x + Δ, y, z)-(self.f)(x, y, z))/Δ
+    }
+    pub fn ddy(&self, x:f64, y:f64, z:f64) -> f64 {
+        ((self.f)(x, y + Δ, z)-(self.f)(x, y, z))/Δ
+    }
+    pub fn ddz(&self, x:f64, y:f64, z:f64) -> f64 {
+        ((self.f)(x, y, z + Δ)-(self.f)(x, y, z))/Δ
+    }
+}
+pub fn grad_2d(f:&Function2D) -> VectorFunction2D {
+    let f1 = f.clone();
+    let f2 = f.clone();
+    VectorFunction2D {
+        expression_f1: String::from("Gradient x"),
+        expression_f2: String::from("Gradient y"),
+        f1: Box::new(move |x:f64, y:f64| f1.ddx(x, y)),
+        f2: Box::new(move |x:f64, y:f64| f2.ddy(x, y)),
+    }
+}
+pub fn grad_3d(f:&Function3D) -> VectorFunction3D {
+    let f1 = f.clone();
+    let f2 = f.clone();
+    let f3 = f.clone();
+    VectorFunction3D {
+        expression_f1: String::from("Gradient x"),
+        expression_f2: String::from("Gradient y"),
+        expression_f3: String::from("Gradient z"),
+        f1: Box::new(move |x:f64, y:f64, z:f64| f1.ddx(x, y, z)),
+        f2: Box::new(move |x:f64, y:f64, z:f64| f2.ddy(x, y, z)),
+        f3: Box::new(move |x:f64, y:f64, z:f64| f3.ddz(x, y, z)),
+    }
+}
+#[macro_export]
+macro_rules! grad_2d {
+    ($f:expr) => {
+        grad_2d(&$f)
+    }
+}
+#[macro_export]
+macro_rules! grad_3d {
+    ($f:expr) => {
+        grad_3d(&$f)
+    }
+}
+#[derive(Copy, Clone)]
+pub struct Set {
+    pub i:f64,
+    pub f:f64
+}
+#[macro_export]
+macro_rules! set {
+    ($i:expr, $f:expr) => {Set {
+        i: $i,
+        f: $f
+    }};
+}
+
+// VECTOR FUNCTIONS
+pub struct VectorFunction2D {
+    pub f1:Box<dyn Fn(f64, f64) -> f64>,
+    pub expression_f1:String,
+    pub f2:Box<dyn Fn(f64, f64) -> f64>,
+    pub expression_f2:String
+}
+
+impl Display for VectorFunction2D {
+    fn fmt(&self, f: &mut Formatter<'_>) -> std::fmt::Result {
+        write!(f, "⟨{:.5}, {:.5}⟩", self.expression_f1, self.expression_f2)
+    }
+}
+pub struct VectorFunction3D {
+    pub f1:Box<dyn Fn(f64, f64, f64) -> f64>,
+    pub expression_f1:String,
+    pub f2:Box<dyn Fn(f64, f64, f64) -> f64>,
+    pub expression_f2:String,
+    pub f3:Box<dyn Fn(f64, f64, f64) -> f64>,
+    pub expression_f3:String
+}
+impl Display for VectorFunction3D {
+    fn fmt(&self, f: &mut Formatter<'_>) -> std::fmt::Result {
+        write!(f, "⟨{:.5}, {:.5}, {:.5}⟩", self.expression_f1, self.expression_f2, self.expression_f3)
+    }
+}
+impl VectorFunction2D {
+    pub fn ddx(&self, x:f64, y:f64) -> Vector2D {
+        Vector2D::new(((self.f1)(x + Δ, y)-(self.f1)(x, y))/Δ,((self.f2)(x + Δ, y)-(self.f2)(x, y))/Δ)
+    }
+    pub fn ddy(&self, x:f64, y:f64) -> Vector2D {
+        Vector2D::new(((self.f1)(x, y + Δ)-(self.f1)(x, y))/Δ,((self.f2)(x, y + Δ)-(self.f2)(x, y))/Δ)
+    }
+
+    pub fn curl(&self, x:f64, y:f64) -> f64 {
+        self.ddx(x, y).y - self.ddy(x, y).x
+    }
+
+    pub fn div(&self, x:f64, y:f64) -> f64 {
+        self.ddx(x, y).x + self.ddy(x, y).y
+    }
+}
+impl VectorFunction3D {
+    pub fn ddx(&self, x:f64, y:f64, z:f64) -> Vector3D {
+        Vector3D::new(((self.f1)(x + Δ, y, z)-(self.f1)(x, y, z))/Δ,((self.f2)(x + Δ, y, z)-(self.f2)(x, y, z))/Δ, ((self.f3)(x + Δ, y, z)-(self.f3)(x, y, z))/Δ)
+    }
+    pub fn ddy(&self, x:f64, y:f64, z:f64) -> Vector3D {
+        Vector3D::new(((self.f1)(x, y + Δ, z)-(self.f1)(x, y, z))/Δ,((self.f2)(x, y + Δ, z)-(self.f2)(x, y, z))/Δ, ((self.f3)(x, y + Δ, z)-(self.f3)(x, y, z))/Δ)
+    }
+    pub fn ddz(&self, x:f64, y:f64, z:f64) -> Vector3D {
+        Vector3D::new(((self.f1)(x, y, z + Δ)-(self.f1)(x, y, z))/Δ,((self.f2)(x, y, z + Δ)-(self.f2)(x, y, z))/Δ, ((self.f3)(x, y, z + Δ)-(self.f3)(x, y, z))/Δ)
+    }
+
+    pub fn curl(&self, x:f64, y:f64, z:f64) -> Vector3D {
+        Vector3D::new(self.ddy(x, y, z).z - self.ddz(x, y, z).y, self.ddz(x, y, z).x - self.ddx(x, y, z).z, self.ddx(x, y, z).y - self.ddy(x, y, z).x)
+    }
+
+    pub fn div(&self, x:f64, y:f64, z:f64) -> f64 {
+        self.ddx(x, y, z).x + self.ddy(x, y, z).y + self.ddz(x, y, z).z
+    }
+}
+
+#[macro_export]
+macro_rules! vector_function_2d {
+    ($x:ident, $y:ident, $f1:expr, $f2:expr) => {
+        VectorFunction2D {
+            f1: Box::new(|$x:f64, $y:f64| $f1),
+            expression_f1: String::from(stringify!($f1)),
+            f2: Box::new(|$x:f64, $y:f64| $f2),
+            expression_f2: String::from(stringify!($f2))
+        }
+    }
+}
+#[macro_export]
+macro_rules! vector_function_3d {
+    ($x:ident, $y:ident, $z:ident, $f1:expr, $f2:expr, $f3:expr) => {
+        VectorFunction3D {
+            f1: Box::new(|$x:f64, $y:f64, $z:f64| $f1),
+            expression_f1: String::from(stringify!($f1)),
+            f2: Box::new(|$x:f64, $y:f64, $z:f64| $f2),
+            expression_f2: String::from(stringify!($f2)),
+            f3: Box::new(|$x:f64, $y:f64, $z:f64| $f3),
+            expression_f3: String::from(stringify!($f3))
+        }
+    }
+}
+
+impl FnOnce<(f64, f64)> for VectorFunction2D {
+    type Output = Vector2D;
+
+    extern "rust-call" fn call_once(self, args: (f64, f64)) -> Self::Output {
+        Vector2D::new((self.f1)(args.0, args.1), (self.f2)(args.0, args.1))
+    }
+}
+
+impl FnMut<(f64, f64)> for VectorFunction2D {
+    extern "rust-call" fn call_mut(&mut self, args: (f64, f64)) -> Self::Output {
+        Vector2D::new((self.f1)(args.0, args.1), (self.f2)(args.0, args.1))
+    }
+}
+
+impl Fn<(f64, f64)> for VectorFunction2D {
+    extern "rust-call" fn call(&self, args: (f64, f64)) -> Self::Output {
+        Vector2D::new((self.f1)(args.0, args.1), (self.f2)(args.0, args.1))
+    }
+}
+impl FnOnce<(f64, f64, f64)> for VectorFunction3D {
+    type Output = Vector3D;
+
+    extern "rust-call" fn call_once(self, args: (f64, f64, f64)) -> Self::Output {
+        Vector3D::new((self.f1)(args.0, args.1, args.2), (self.f2)(args.0, args.1, args.2), (self.f3)(args.0, args.1, args.2))
+    }
+}
+impl FnMut<(f64, f64, f64)> for VectorFunction3D {
+    extern "rust-call" fn call_mut(&mut self, args: (f64, f64, f64)) -> Self::Output {
+        Vector3D::new((self.f1)(args.0, args.1, args.2), (self.f2)(args.0, args.1, args.2), (self.f3)(args.0, args.1, args.2))
+    }
+}
+impl Fn<(f64, f64, f64)> for VectorFunction3D {
+    extern "rust-call" fn call(&self, args: (f64, f64, f64)) -> Self::Output {
+        Vector3D::new((self.f1)(args.0, args.1, args.2), (self.f2)(args.0, args.1, args.2), (self.f3)(args.0, args.1, args.2))
+    }
+}
+// PARAMETRIC CURVES
+pub struct ParametricCurve2D {
+    pub f1:Box<dyn Fn(f64) -> f64>,
+    pub expression_f1:String,
+    pub f2:Box<dyn Fn(f64) -> f64>,
+    pub expression_f2:String,
+}
+pub struct ParametricCurve3D {
+    pub f1:Box<dyn Fn(f64) -> f64>,
+    pub expression_f1:String,
+    pub f2:Box<dyn Fn(f64) -> f64>,
+    pub expression_f2:String,
+    pub f3:Box<dyn Fn(f64) -> f64>,
+    pub expression_f3:String
+}
+
+impl ParametricCurve2D {
+    pub fn ddt(&self, t:f64) -> Vector2D {
+        return Vector2D::new(((self.f1)(t + Δ) - (self.f1)(t))/Δ, ((self.f2)(t + Δ) - (self.f2)(t))/Δ)
+    }
+}
+impl ParametricCurve3D {
+    pub fn ddt(&self, t:f64) -> Vector3D {
+        return Vector3D::new(((self.f1)(t + Δ) - (self.f1)(t))/Δ, ((self.f2)(t + Δ) - (self.f2)(t))/Δ, ((self.f3)(t + Δ) - (self.f3)(t))/Δ)
+    }
+}
+
+#[macro_export]
+macro_rules! curve_2d {
+    ($t:ident, $f1:expr, $f2:expr) => {
+        ParametricCurve2D {
+            f1: Box::new(|$t:f64| $f1),
+            expression_f1: String::from(stringify!($f1)),
+            f2: Box::new(|$t:f64| $f2),
+            expression_f2: String::from(stringify!($f2)),
+        }
+    };
+}
+#[macro_export]
+macro_rules! curve_3d {
+    ($t:ident, $f1:expr, $f2:expr, $f3:expr) => {
+        ParametricCurve3D {
+            f1: Box::new(|$t:f64| $f1),
+            expression_f1: String::from(stringify!($f1)),
+            f2: Box::new(|$t:f64| $f2),
+            expression_f2: String::from(stringify!($f2)),
+            f3: Box::new(|$t:f64| $f3),
+            expression_f3: String::from(stringify!($f3))
+        }
+    };
+}
+
+impl FnOnce<(f64,)> for ParametricCurve2D {
+    type Output = Vector2D;
+
+    extern "rust-call" fn call_once(self, args: (f64,)) -> Self::Output {
+        Vector2D::new((self.f1)(args.0), (self.f2)(args.0))
+    }
+}
+
+impl FnMut<(f64,)> for ParametricCurve2D {
+    extern "rust-call" fn call_mut(&mut self, args: (f64,)) -> Self::Output {
+        Vector2D::new((self.f1)(args.0), (self.f2)(args.0))
+    }
+}
+
+impl Fn<(f64,)> for ParametricCurve2D {
+    extern "rust-call" fn call(&self, args: (f64,)) -> Self::Output {
+        Vector2D::new((self.f1)(args.0), (self.f2)(args.0))
+    }
+}
+impl FnOnce<(f64,)> for ParametricCurve3D {
+    type Output = Vector3D;
+
+    extern "rust-call" fn call_once(self, args: (f64,)) -> Self::Output {
+        Vector3D::new((self.f1)(args.0), (self.f2)(args.0), (self.f3)(args.0))
+    }
+}
+impl FnMut<(f64,)> for ParametricCurve3D {
+    extern "rust-call" fn call_mut(&mut self, args: (f64,)) -> Self::Output {
+        Vector3D::new((self.f1)(args.0), (self.f2)(args.0), (self.f3)(args.0))
+    }
+}
+impl Fn<(f64,)> for ParametricCurve3D {
+    extern "rust-call" fn call(&self, args: (f64,)) -> Self::Output {
+        Vector3D::new((self.f1)(args.0), (self.f2)(args.0), (self.f3)(args.0))
+    }
+}
+// Contours
+pub struct Contour2D {
+    pub f_t: ParametricCurve2D,
+    pub lim: Set
+}
+impl Display for Contour2D {
+    fn fmt(&self, f: &mut Formatter<'_>) -> std::fmt::Result {
+        write!(f, "⟨{:.5}, {:.5}⟩", self.f_t.expression_f1, self.f_t.expression_f2)
+    }
+}
+pub struct Contour3D {
+    pub f_t: ParametricCurve3D,
+    pub lim: Set
+}
+impl Display for Contour3D {
+    fn fmt(&self, f: &mut Formatter<'_>) -> std::fmt::Result {
+        write!(f, "⟨{:.5}, {:.5}, {:.5}⟩", self.f_t.expression_f1, self.f_t.expression_f2, self.f_t.expression_f3)
+    }
+}
+impl FnOnce<(f64,)> for Contour2D {
+    type Output = Vector2D;
+
+    extern "rust-call" fn call_once(self, args: (f64,)) -> Self::Output {
+        (self.f_t)(args.0)
+    }
+}
+
+impl FnMut<(f64,)> for Contour2D {
+    extern "rust-call" fn call_mut(&mut self, args: (f64,)) -> Self::Output {
+        (self.f_t)(args.0)
+    }
+}
+
+impl Fn<(f64,)> for Contour2D {
+    extern "rust-call" fn call(&self, args: (f64,)) -> Self::Output {
+        (self.f_t)(args.0)
+    }
+}
+impl FnOnce<(f64,)> for Contour3D {
+    type Output = Vector3D;
+
+    extern "rust-call" fn call_once(self, args: (f64,)) -> Self::Output {
+        (self.f_t)(args.0)
+    }
+}
+impl FnMut<(f64,)> for Contour3D {
+    extern "rust-call" fn call_mut(&mut self, args: (f64,)) -> Self::Output {
+        (self.f_t)(args.0)
+    }
+}
+impl Fn<(f64,)> for Contour3D {
+    extern "rust-call" fn call(&self, args: (f64,)) -> Self::Output {
+        (self.f_t)(args.0)
+    }
+}
+#[macro_export]
+macro_rules! contour_2d {
+    ($t:ident, $f1:expr, $f2:expr, $t0:expr, $t1:expr) => {
+        Contour2D {
+            f_t: curve_2d!($t, $f1, $f2),
+            lim: set![$t0, $t1]
+        }
+    };
+}
+#[macro_export]
+macro_rules! contour_3d {
+    ($t:ident, $f1:expr, $f2:expr, $f3:expr, $t0:expr, $t1:expr) => {
+        Contour3D {
+            f_t: curve_3d!($t, $f1, $f2, $f3),
+            lim: set![$t0, $t1]
+        }
+    };
+}
+
+// FUNCTIONS & SHI
+trait Integral {
+    fn integral(&self, a:f64, b:f64) -> f64;
+}
+/*impl Integral for Function2D {
+    fn integral(&self, a:f64, b:f64) -> f64 {
+        let mut sum = 0.;
+        for j in 0..((b-a)/Δ) as usize {
+            let ti = a + Δ*j as f64;
+            let ft = (self.f)(ti);
+            sum += ft;
+        }
+        sum*Δ
+    }
+}*/
+macro_rules! near {
+    ($a:expr, $b:expr; $e:expr) => {
+        $a > $b - $e && $a < $b + $e
+    };
+}
+macro_rules! near_2d {
+    ($v1:expr, $v2:expr; $e:expr) => {
+        $v1.x > $v2.x - $e && $v1.x < $v2.x + $e
+        && $v1.y > $v2.y - $e && $v1.y < $v2.y + $e
+    };
+}
+macro_rules! near_3d {
+    ($v1:expr, $v2:expr; $e:expr) => {
+        $v1.x > $v2.x - $e && $v1.x < $v2.x + $e
+        && $v1.y > $v2.y - $e && $v1.y < $v2.y + $e
+        && $v1.z > $v2.z - $e && $v1.z < $v2.z + $e
+    };
+}
+#[derive(Copy, Clone, Default)]
+pub enum IntegrationMethod {
+    Riemann,
+    Trapezoid,
+    #[default]
+    GaussLegendre,
+}
+// Change so that it works by implementing traits
+pub enum Contour<'s> {
+    TwoD(&'s Contour2D),
+    ThreeD(&'s Contour3D),
+}
+trait Potential {
+    fn check_curl(&self, c:&Contour) -> f64;
+}
+impl Potential for VectorFunction2D {
+    fn check_curl(&self, c: &Contour) -> f64 {
+        if let Contour::TwoD(c) = c {
+            let (half, third) = ((71./67.)*((c.lim.f-c.lim.i)/2.), (129./131.)*((c.lim.f-c.lim.i)/3.));
+            if near!(self.curl((c.f_t)(half).x, (c.f_t)(half).y), 0.;Δ) // Gradient Field
+                && near!(self.curl((c.f_t)(third).x, (c.f_t)(third).y), 0.;Δ) {
+                if near_2d!((c.f_t)(c.lim.f), (c.f_t)(c.lim.i);Δ) { // Closed contour
+                    return 0.
+                } else {
+                    return 1.
+                }
+            }
+        }
+        2.
+    }
+}
+impl Potential for VectorFunction3D {
+    fn check_curl(&self, c: &Contour) -> f64 {
+        if let Contour::ThreeD(c) = c {
+            let (half, third) = ((71./67.)*((c.lim.f-c.lim.i)/2.), (129./131.)*((c.lim.f-c.lim.i)/3.));
+            if near_3d!(self.curl((c.f_t)(half).x, (c.f_t)(half).y, (c.f_t)(half).z), Vector3D::new(0., 0., 0.);Δ) // Gradient Field
+                && near_3d!(self.curl((c.f_t)(third).x, (c.f_t)(third).y, (c.f_t)(half).z), Vector3D::new(0., 0., 0.);Δ) {
+                if near_3d!((c.f_t)(c.lim.f), (c.f_t)(c.lim.i);Δ) { // Closed contour
+                    return 0.
+                } else {
+                    return 1.
+                }
+            }
+        }
+        2.
+    }
+}
+pub enum Vector {
+    TwoD(Vector2D),
+    ThreeD(Vector3D)
+}
+trait Vectors {
+    fn eval(&self, v:Vec<f64>) -> Vector;
+}
+impl Vectors for VectorFunction2D {
+    fn eval(&self, v:Vec<f64>) -> Vector {
+        Vector::TwoD(Vector2D::new((self.f1)(v[0], v[1]), (self.f2)(v[0], v[1])))
+    }
+}
+impl Vectors for VectorFunction3D {
+    fn eval(&self, v:Vec<f64>) -> Vector {
+        Vector::ThreeD(Vector3D::new((self.f1)(v[0], v[1], v[2]), (self.f2)(v[0], v[1], v[2]), (self.f3)(v[0], v[1], v[2])))
+    }
+}
+pub enum VectorFunction {
+    TwoD(VectorFunction2D),
+    ThreeD(VectorFunction3D)
+}
+impl Potential for VectorFunction {
+    fn check_curl(&self, c: &Contour) -> f64 {
+        match self {
+            VectorFunction::TwoD(two_d) => {two_d.check_curl(c)}
+            VectorFunction::ThreeD(three_d) => {three_d.check_curl(c)}
+        }
+    }
+}
+pub fn line_integral(v:&(impl Potential + Vectors), c:&Contour) -> f64 {
+    if v.check_curl(c) == 0. {
+        return 0.
+    }
+    let (t0, dt):(f64, f64);
+    match c {
+        Contour::TwoD(c) => {
+            t0 = (c.lim.i+c.lim.f)/2.;
+            dt = (c.lim.f-c.lim.i)/2.;
+        }
+        Contour::ThreeD(c) => {
+            t0 = (c.lim.i+c.lim.f)/2.;
+            dt = (c.lim.f-c.lim.i)/2.;
+        }
+    }
+    let ft = Box::new(move |t:f64| {
+        return match c {
+            Contour::TwoD(c) => {
+                let vt = (c.f_t)(t0 + dt * t);
+                match v.eval(vec![vt.x, vt.y]) {
+                    Vector::TwoD(v) => { v * c.f_t.ddt(t0 + dt * t) * dt }
+                    Vector::ThreeD(v) => { 0. }
+                }
+            }
+            Contour::ThreeD(c) => {
+                let vt = (c.f_t)(t0 + dt * t);
+                match v.eval(vec![vt.x, vt.y, vt.z]) {
+                    Vector::TwoD(v) => { 0. }
+                    Vector::ThreeD(v) => { v * c.f_t.ddt(t0 + dt * t) * dt }
+                }
+            }
+        }
+    });
+    let w1 = 128f64/225f64;
+    let w2 = (322f64+13f64*70f64.sqrt())/900f64;
+    let w3 = (322f64-13f64*70f64.sqrt())/900f64;
+    let x2 = (1f64/3f64)*(5f64-2f64*(10f64/7f64).sqrt()).sqrt();
+    let x3 = (1f64/3f64)*(5f64+2f64*(10f64/7f64).sqrt()).sqrt();
+    w1*ft(0.0) + w2*(ft(-x2)+ft(x2)) + w3*(ft(-x3)+ft(x3))
+}
+pub fn line_integral_2d(v:&VectorFunction2D, c:&Contour, method:IntegrationMethod) -> f64 {
+    if v.check_curl(c) == 0. {
+        return 0.
+    }
+    let c = match c {
+        Contour::TwoD(c) => {c}
+        Contour::ThreeD(_) => {&&contour_2d!(t, t, 2.*t, 0., 1.)}
+    };
+    match method {
+        IntegrationMethod::Riemann => {
+            let mut sum = 0.;
+            for j in 0..((c.lim.f-c.lim.i)/Δ) as usize {
+                let ti = c.lim.i + Δ*j as f64;
+                let vt = (c.f_t)(ti);
+                sum += v(vt.x, vt.y)*c.f_t.ddt(ti); // Dot product between them
+            }
+            sum*Δ
+        },
+        IntegrationMethod::Trapezoid => {
+            let h = 0.5;
+            let mut ti;
+            let mut sum = 0.;
+            let ft = |t:f64 | {
+                let vt = (c.f_t)(t);
+                v(vt.x, vt.y)*c.f_t.ddt(t)
+            };
+            for i in 1..((c.lim.f-c.lim.i)/Δ) as usize {
+                ti = c.lim.i + i as f64 * Δ;
+                sum += ft(ti);
+            }
+            h * Δ * (ft(c.lim.i) + ft(c.lim.f) + 2.0 * sum)
+        },
+        IntegrationMethod::GaussLegendre => {
+            let ft = Box::new(move |t:f64| {
+                let t0 = (c.lim.i+c.lim.f)/2.0;
+                let dt = (c.lim.f-c.lim.i)/2.0;
+                let vt = (c.f_t)(t0 + dt*t);
+                v(vt.x, vt.y)*c.f_t.ddt(t0 + dt*t)*dt
+            });
+            let w1 = 128f64/225f64;
+            let w2 = (322f64+13f64*70f64.sqrt())/900f64;
+            let w3 = (322f64-13f64*70f64.sqrt())/900f64;
+            let x2 = (1f64/3f64)*(5f64-2f64*(10f64/7f64).sqrt()).sqrt();
+            let x3 = (1f64/3f64)*(5f64+2f64*(10f64/7f64).sqrt()).sqrt();
+            w1*ft(0.0) + w2*(ft(-x2)+ft(x2)) + w3*(ft(-x3)+ft(x3))
+        }
+    }
+}
+
+pub trait ContourWrapper<'s> {
+    fn wrap(&'s self) -> Contour<'s>;
+}
+impl<'s> ContourWrapper<'s> for Contour2D {
+    fn wrap(&'s self) -> Contour<'s> {
+        Contour::TwoD(self)
+    }
+}
+
+impl<'s> ContourWrapper<'s> for Contour3D {
+    fn wrap(&'s self) -> Contour<'s> {
+        Contour::ThreeD(self)
+    }
+}
+#[macro_export]
+macro_rules! line_integral {
+    ($v:expr, $c:expr) => { // Default
+        line_integral(&$v, &$c.wrap())
+    };
+}
+#[macro_export]
+macro_rules! line_integral_2d {
+    ($v:expr, $c:expr, $method:expr) => {
+        line_integral_2d(&$v, &$c, $method)
+    };
+}
+
+pub fn type_of<T>(_: &T) -> &str {
+    std::any::type_name::<T>().split("::").collect::<Vec<&str>>().last().unwrap()
+}
+pub fn limit_2d(f:&Function2D, x:f64, y:f64) -> f64 {
+    let up = f(x + Δ, y + Δ);
+    let down = f(x - Δ, y - Δ);
+    (up + down)/2.
+}
+pub fn limit_3d(f:&Function3D, x:f64, y:f64, z:f64) -> f64 {
+    let up = f(x + Δ, y + Δ, z + Δ);
+    let down = f(x - Δ, y - Δ, z - Δ);
+    (up + down)/2.
+}
+#[macro_export]
+macro_rules! limit {
+    ($f:expr => $x:expr,$y:expr) => {limit_2d(&$f, $x, $y)};
+    ($f:expr => $x:expr,$y:expr, $z:expr) => {limit_3d(&$f, $x, $y, $z)};
+}
+
+fn main() {
+
+    /*let f = vector_function_2d!(x, y, x.powi(2), x*y);
+    let c = contour_2d!(t, t, t.powi(2), 0., 1.);
+    let c = contour_2d!(t, t.cos(), t.sin(), 0., 2.*PI);
+    println!("∫cF·ds = {}, c(pi) = {}", line_integral!(f, c), c(PI));
+
+    let g = fxy!(x, y, x*y);
+    let del_g = grad_2d!(g);
+    println!("G(1,2) = {}    ∇G(1,2) = {}", limit!(g => 1., 2.), del_g(1.,2.));
+    println!("∫c∇G·ds = {}", line_integral!(del_g, c));*/
+    let f = vector_function_3d!(x, y, z, x.powi(2), x*y, 1.);
+    let c = contour_3d!(t, t, t.powi(2), 1., 0., 1.);
+    let work = line_integral!(f, c);
+
+    println!("F = {}", f);
+    println!("C = {}", c);
+    println!("∫cF·ds = {:.5}", work);
+
+}
+
+/*
+dyn-clone = "1.0.17"
+*/
