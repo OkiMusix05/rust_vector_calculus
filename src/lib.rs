@@ -5,12 +5,12 @@ use dyn_clone::DynClone;
 const Δ:f64 = 5e-6;
 
 // ----- VECTORS -----
-#[derive(Copy, Clone)]
+#[derive(Copy, Clone, Debug)]
 pub struct Vector2 {
     pub x:f64,
     pub y:f64
 }
-#[derive(Copy, Clone)]
+#[derive(Copy, Clone, Debug)]
 pub struct Vector3 {
     pub x:f64,
     pub y:f64,
@@ -66,7 +66,7 @@ impl Display for Vector3 {
         write!(f, "⟨{:.5}, {:.5}, {:.5}⟩", self.x, self.y, self.z)
     }
 }
-#[derive(Copy, Clone)]
+#[derive(Copy, Clone, Debug)]
 pub enum Vector {
     TwoD(Vector2),
     ThreeD(Vector3)
@@ -94,6 +94,15 @@ impl Vector {
         match self {
             Vector::TwoD(_) => 0.,
             Vector::ThreeD(v) => v.z
+        }
+    }
+}
+impl PartialEq for Vector {
+    fn eq(&self, rhs: &Self) -> bool {
+        match (self, rhs) {
+            (Vector::TwoD(u), Vector::TwoD(v)) => if u.x == v.x && u.y == v.y { true } else {false},
+            (Vector::ThreeD(u), Vector::ThreeD(v)) => if u.x == v.x && u.y == v.y && u.z == v.z { true } else { false },
+            (_, _) => false
         }
     }
 }
@@ -673,15 +682,290 @@ macro_rules! grad {
 }
 
 // ----- PARAMETRIC CURVES -----
+pub struct ParametricCurve2D {
+    pub f1:Box<dyn Fn(f64) -> f64>,
+    pub expression_f1:String,
+    pub f2:Box<dyn Fn(f64) -> f64>,
+    pub expression_f2:String,
+}
+impl ParametricCurve2D {
+    pub fn ddt(&self, t:f64) -> Vector {
+        Vector::TwoD(Vector2::new(((self.f1)(t + Δ) - (self.f1)(t))/Δ, ((self.f2)(t + Δ) - (self.f2)(t))/Δ))
+    }
+}
+impl FnOnce<(f64,)> for ParametricCurve2D {
+    type Output = Vector;
+
+    extern "rust-call" fn call_once(self, args: (f64,)) -> Self::Output {
+        Vector::TwoD(Vector2::new((self.f1)(args.0), (self.f2)(args.0)))
+    }
+}
+impl FnMut<(f64,)> for ParametricCurve2D {
+    extern "rust-call" fn call_mut(&mut self, args: (f64,)) -> Self::Output {
+        Vector::TwoD(Vector2::new((self.f1)(args.0), (self.f2)(args.0)))
+    }
+}
+impl Fn<(f64,)> for ParametricCurve2D {
+    extern "rust-call" fn call(&self, args: (f64,)) -> Self::Output {
+        Vector::TwoD(Vector2::new((self.f1)(args.0), (self.f2)(args.0)))
+    }
+}
+pub struct ParametricCurve3D {
+    pub f1:Box<dyn Fn(f64) -> f64>,
+    pub expression_f1:String,
+    pub f2:Box<dyn Fn(f64) -> f64>,
+    pub expression_f2:String,
+    pub f3:Box<dyn Fn(f64) -> f64>,
+    pub expression_f3:String
+}
+impl ParametricCurve3D {
+    pub fn ddt(&self, t:f64) -> Vector {
+        Vector::ThreeD(Vector3::new(((self.f1)(t + Δ) - (self.f1)(t))/Δ, ((self.f2)(t + Δ) - (self.f2)(t))/Δ, ((self.f3)(t + Δ) - (self.f3)(t))/Δ))
+    }
+}
+impl FnOnce<(f64,)> for ParametricCurve3D {
+    type Output = Vector;
+
+    extern "rust-call" fn call_once(self, args: (f64,)) -> Self::Output {
+        Vector::ThreeD(Vector3::new((self.f1)(args.0), (self.f2)(args.0), (self.f3)(args.0)))
+    }
+}
+impl FnMut<(f64,)> for ParametricCurve3D {
+    extern "rust-call" fn call_mut(&mut self, args: (f64,)) -> Self::Output {
+        Vector::ThreeD(Vector3::new((self.f1)(args.0), (self.f2)(args.0), (self.f3)(args.0)))
+    }
+}
+impl Fn<(f64,)> for ParametricCurve3D {
+    extern "rust-call" fn call(&self, args: (f64,)) -> Self::Output {
+        Vector::ThreeD(Vector3::new((self.f1)(args.0), (self.f2)(args.0), (self.f3)(args.0)))
+    }
+}
+pub enum ParametricCurve {
+    TwoD(ParametricCurve2D),
+    ThreeD(ParametricCurve3D)
+}
+impl ParametricCurve {
+    pub fn ddt(&self, t:f64) -> Vector {
+        match self {
+            ParametricCurve::TwoD(sigma) => sigma.ddt(t),
+            ParametricCurve::ThreeD(sigma) => sigma.ddt(t)
+        }
+    }
+}
+impl Display for ParametricCurve {
+    fn fmt(&self, f: &mut Formatter<'_>) -> std::fmt::Result {
+        match self {
+            ParametricCurve::TwoD(sigma) => {
+                write!(f, "⟨{}, {}⟩", sigma.expression_f1, sigma.expression_f2)
+            }
+            ParametricCurve::ThreeD(sigma) => {
+                write!(f, "⟨{}, {}, {}⟩", sigma.expression_f1, sigma.expression_f2, sigma.expression_f3)
+            }
+        }
+    }
+}
+#[macro_export]
+macro_rules! curve {
+    ($t:ident, $f1:expr, $f2:expr) => {
+        ParametricCurve::TwoD(ParametricCurve2D {
+            f1: Box::new(|$t:f64| $f1),
+            expression_f1: String::from(stringify!($f1)),
+            f2: Box::new(|$t:f64| $f2),
+            expression_f2: String::from(stringify!($f2)),
+        })
+    };
+    ($t:ident, $f1:expr, $f2:expr, $f3:expr) => {
+        ParametricCurve::ThreeD(ParametricCurve3D {
+            f1: Box::new(|$t:f64| $f1),
+            expression_f1: String::from(stringify!($f1)),
+            f2: Box::new(|$t:f64| $f2),
+            expression_f2: String::from(stringify!($f2)),
+            f3: Box::new(|$t:f64| $f3),
+            expression_f3: String::from(stringify!($f3))
+        })
+    };
+}
+impl FnOnce<(f64,)> for ParametricCurve {
+    type Output = Vector;
+
+    extern "rust-call" fn call_once(self, args: (f64,)) -> Self::Output {
+        match self {
+            ParametricCurve::TwoD(sigma) => sigma(args.0),
+            ParametricCurve::ThreeD(sigma) => sigma(args.0)
+        }
+    }
+}
+impl FnMut<(f64,)> for ParametricCurve {
+    extern "rust-call" fn call_mut(&mut self, args: (f64,)) -> Self::Output {
+        match self {
+            ParametricCurve::TwoD(sigma) => sigma(args.0),
+            ParametricCurve::ThreeD(sigma) => sigma(args.0)
+        }
+    }
+}
+impl Fn<(f64,)> for ParametricCurve {
+    extern "rust-call" fn call(&self, args: (f64,)) -> Self::Output {
+        match self {
+            ParametricCurve::TwoD(sigma) => sigma(args.0),
+            ParametricCurve::ThreeD(sigma) => sigma(args.0)
+        }
+    }
+}
+macro_rules! ddt {
+    ($f:expr, $t:expr) => {$f.ddt($t as f64)};
+}
 
 // ----- SETS -----
+#[derive(Copy, Clone)]
+pub struct Set {
+    pub i:f64,
+    pub f:f64
+}
+impl Set {
+    pub fn linspace(&self, n:i32) -> Vec<f64> {
+        let mut space:Vec<f64> = vec![self.i];
+        let δ:f64 = (self.f-self.i)/(n as f64);
+        for i in 0..n {
+            space.push(self.i+ δ*(i as f64));
+        }
+        space
+    }
+}
+#[macro_export]
+macro_rules! set {
+    ($i:expr, $f:expr) => {Set {
+        i: $i as f64,
+        f: $f as f64
+    }};
+}
+impl Display for Set {
+    fn fmt(&self, f: &mut Formatter<'_>) -> std::fmt::Result {
+        write!(f, "[{:.5}, {:.5}]", self.i, self.f)
+    }
+}
 
 // ----- CONTOURS -----
+pub struct Contour2D {
+    pub f_t: ParametricCurve2D,
+    pub lim: Set
+}
+pub struct Contour3D {
+    pub f_t: ParametricCurve3D,
+    pub lim: Set
+}
+pub enum Contour {
+    TwoD(Contour2D),
+    ThreeD(Contour3D)
+}
+impl Contour {
+    pub fn ddt(&self, t:f64) -> Vector {
+        match self {
+            Contour::TwoD(c) => c.f_t.ddt(t),
+            Contour::ThreeD(c) => c.f_t.ddt(t)
+        }
+    }
+    pub fn bounds(&self) -> (f64, f64) {
+        match self {
+            Contour::TwoD(c) => (c.lim.i, c.lim.f),
+            Contour::ThreeD(c) => (c.lim.i, c.lim.f)
+        }
+    }
+    pub fn linspace(&self, t:i32) -> Vec<f64> {
+        match self {
+            Contour::TwoD(c) => c.lim.linspace(t),
+            Contour::ThreeD(c) => c.lim.linspace(t)
+        }
+    }
+}
+impl Display for Contour {
+    fn fmt(&self, f: &mut Formatter<'_>) -> std::fmt::Result {
+        match self {
+            Contour::TwoD(c) => {
+                write!(f, "⟨{}, {}⟩", c.f_t.expression_f1, c.f_t.expression_f2)
+            }
+            Contour::ThreeD(c) => {
+                write!(f, "⟨{}, {}, {}⟩", c.f_t.expression_f1, c.f_t.expression_f2, c.f_t.expression_f3)
+            }
+        }
+    }
+}
+#[macro_export]
+macro_rules! contour {
+    ($t:ident, $f1:expr, $f2:expr, $t0:expr, $t1:expr) => {
+        Contour::TwoD(Contour2D {
+            f_t: ParametricCurve2D {
+                f1: Box::new(|$t:f64| { $f1 }),
+                expression_f1: String::from(stringify!($f1)),
+                f2: Box::new(|$t:f64| { $f2 }),
+                expression_f2: String::from(stringify!($f2))
+            },
+            lim: set![$t0, $t1]
+        })
+    };
+    ($t:ident, $f1:expr, $f2:expr, $f3:expr, $t0:expr, $t1:expr) => {
+        Contour::ThreeD(Contour3D {
+            f_t: ParametricCurve3D {
+                f1: Box::new(|$t:f64| { $f1 }),
+                expression_f1: String::from(stringify!($f1)),
+                f2: Box::new(|$t:f64| { $f2 }),
+                expression_f2: String::from(stringify!($f2)),
+                f3: Box::new(|$t:f64| { $f3 }),
+                expression_f3: String::from(stringify!($f3))
+            },
+            lim: set![$t0, $t1]
+        })
+    };
+    ($curve:expr, $set:expr) => {
+        match $curve {
+            ParametricCurve::TwoD(c) => {
+                Contour::TwoD(Contour2D {
+                    f_t: c,
+                    lim: $set
+                })
+            },
+            ParametricCurve::ThreeD(c) => {
+                Contour::ThreeD(Contour3D {
+                    f_t: c,
+                    lim: $set
+                })
+            },
+            _ => panic!("Not a valid parametric curve")
+        }
+    }
+}
+impl FnOnce<(f64,)> for Contour {
+    type Output = Vector;
+
+    extern "rust-call" fn call_once(self, args: (f64,)) -> Self::Output {
+        match self {
+            Contour::TwoD(c) => (c.f_t)(args.0),
+            Contour::ThreeD(c) => (c.f_t)(args.0)
+        }
+    }
+}
+impl FnMut<(f64,)> for Contour {
+    extern "rust-call" fn call_mut(&mut self, args: (f64,)) -> Self::Output {
+        match self {
+            Contour::TwoD(c) => (c.f_t)(args.0),
+            Contour::ThreeD(c) => (c.f_t)(args.0)
+        }
+    }
+}
+impl Fn<(f64,)> for Contour {
+    extern "rust-call" fn call(&self, args: (f64,)) -> Self::Output {
+        match self {
+            Contour::TwoD(c) => (c.f_t)(args.0),
+            Contour::ThreeD(c) => (c.f_t)(args.0)
+        }
+    }
+}
+// The ddt macro also works for Contours
 
 // ----- LIMITS -----
 
 // ----- LINE INTEGRAL -----
 
+use std::f64::consts::PI;
 #[cfg(test)]
 mod tests {
     use super::*;
@@ -718,5 +1002,18 @@ mod tests {
         let del_g = grad!(g);
         println!("∇g(1, 2, 3) = {}", del_g(1., 2., 3.));
         //assert_eq!(del_g.potential(vec![1., 2., 3.]), g(1., 2., 3.));
+    }
+
+    #[test]
+    fn contours() {
+        let sigma:ParametricCurve = curve!(t, t.powi(2), 2.*t);
+        let space:Set = set![0., 2.*PI];
+        println!("sigma = {}, space = {}", sigma, space);
+
+        let c:Contour = contour!(t, t.cos(), t.sin(), 0, PI);
+        println!("c(PI/2) = {}, dcdt(PI) = {}, where t is in {:?}", c(PI/2.), ddt!(c, PI), c.bounds());
+
+        let s = contour!(sigma, space);
+        assert_eq!(s(1.), vector!(1., 2.));
     }
 }

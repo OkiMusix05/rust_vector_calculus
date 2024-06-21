@@ -88,3 +88,61 @@ let c:f64 = !curl!(G, 1, PI, 2);
 ```
 
 Note that in the last line of the code shown, the `!` operator is used on the vector produced by the curl macro to obtain the magnitude (modulus) of the rotational of the vector function $G$ at the point $(1,\pi,2)$.
+## Contours
+
+Contours consists of two parts: Parametric Curves and Sets.
+
+### Parametric Curves
+
+Parametric curves are a function that goes from $\mathbb{R}\to\mathbb{R}^n$, where here $n=2,3$. You can create a parametric curve using the`curve!` macro:
+
+```rust
+let curve:ParametricCurve = curve!(t, t.cos(), t.sin()); 
+```
+
+Parametric curves have a derivative method, which you can call like `curve.ddt(1.5)` or using the macro `ddt!(curve, t)`, for example, aside from also saving their expressions as strings like *Vector Functions*.
+
+You can evaluate them in a point as any function, in the form of `curve(PI)`, and it returns a `Vector`.
+
+### Sets
+
+$$
+t\in[0, 2\pi]
+$$
+
+A set in this library consists of the space a variable belongs to. Sets are used in conjunction with parametric curves to provide the bounds for the independent variable of the curve. You can create a set like this:
+
+```rust
+let t_space:Set = set![0, PI];
+```
+
+where the two numbers indicate the continous one-dimensional space where a variable can move.
+
+You can access the start and the end of this set through `t_space.i` and `t_space.f`.
+
+Sets also have a linspace method that you can call like `set.linspace(n)` where $n$ is the number of steps it takes when creating a `Vec` with its values in between.
+
+### Contours
+
+When using these parametric curves for a *line integral*, for example, the preferred method is to use a contour, which you can create like this
+
+```rust
+let c:Contour = contour!(t, t, t.powi(2), 0, 1); // in R^2
+let rho:Contour = contour!(t, t.cos(), t.sin(), t, 0, PI); // in R^3
+```
+
+where the first parameters belong to the parametric curve and the last two to the set.
+
+However, if you already have made two variables for the curve and the set you can make a contour using the same macro like this:
+
+```rust
+let curve:ParametricCurve = curve!(...);
+let space:Set = set![...];
+let sigma:Contour = contour!(curve, spaec);
+```
+
+Contours, like parametric curves, also have a derivative `ddt` method, and the same macro applies here in the same way. Furthermore, like sets, contours have a `c.linspace(n)` method which returns a vector too.
+
+Added to that, contours have a `c.bounds()` method that returns a tuple with two elements containing the start and end of the set.
+
+Note: Contours are also evaluated like regular rust functions (`c(PI/2.)`) and return Vectors like parametric curves.

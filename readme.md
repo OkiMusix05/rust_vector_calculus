@@ -7,6 +7,8 @@ but low-level Rust features.
 - v0.01 - Added Vector Functions, as well as curl, div, gradient, etc.
 - v0.011 - README includes guide for how to use the crate
 - v0.012 - Potential functinos for gradients, and dedicated guide doc
+- v0.015 - Parametric curves, sets, and contours added, as well as equality
+implemented for vectors
 # Usage
 To use the library, the project will have to be using the nightly toolchain,
 for which you can copy the "rust-toolchain.toml" file.\
