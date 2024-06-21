@@ -59,6 +59,16 @@ $$
 Note that creating a vector function like this does not take ownership of the original function.
 
 Note: Contrary to the partial derivative macros, the gradient macro does return a function.
+### Limits
+
+When taking the limit of 2D or 3D scalar functions, the value is approximated by finding the average of the function at $f(x_0\pm\Delta,y_0\pm\Delta)$. For this, you can use the `limit!` macro as so
+
+```rust
+let f:Function = f!(x, y, 2.*x*y);
+let _:f64 = limit(f => 2, 3)
+```
+
+which uses specific notation (`=> ,`) to represent $\lim_{(x,y)\to(2,3)}f$ in this case.
 
 ## Vector Functions
 
@@ -138,7 +148,7 @@ However, if you already have made two variables for the curve and the set you ca
 ```rust
 let curve:ParametricCurve = curve!(...);
 let space:Set = set![...];
-let sigma:Contour = contour!(curve, spaec);
+let sigma:Contour = contour!(curve, space);
 ```
 
 Contours, like parametric curves, also have a derivative `ddt` method, and the same macro applies here in the same way. Furthermore, like sets, contours have a `c.linspace(n)` method which returns a vector too.

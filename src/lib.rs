@@ -422,6 +422,27 @@ impl FnMut<(f64, f64, f64)> for Function {
     }
 }
 
+// ----- LIMITS -----
+pub fn limit_s(f:&Function, args:Vec<f64>) -> f64 {
+    match f {
+        Function::TwoD(_) => {
+            let up = f(args[0] + Δ, args[1] + Δ);
+            let down = f(args[0] - Δ, args[1] - Δ);
+            (up + down)/2.
+        },
+        Function::ThreeD(_) => {
+            let up = f(args[0] + Δ, args[1] + Δ, args[2] + Δ);
+            let down = f(args[0] - Δ, args[1] - Δ, args[2] - Δ);
+            (up + down)/2.
+        }
+    }
+}
+#[macro_export]
+macro_rules! limit {
+    ($f:expr => $x:expr,$y:expr) => {limit_s(&$f, vec![$x as f64, $y as f64])};
+    ($f:expr => $x:expr,$y:expr, $z:expr) => {limit_s(&$f, vec![$x as f64, $y as f64, $z as f64])};
+}
+
 // ----- VECTOR FUNCTIONS -----
 pub struct VectorFunction2D {
     pub f1:Box<dyn Fn(f64, f64) -> f64>,
@@ -961,8 +982,6 @@ impl Fn<(f64,)> for Contour {
 }
 // The ddt macro also works for Contours
 
-// ----- LIMITS -----
-
 // ----- LINE INTEGRAL -----
 
 use std::f64::consts::PI;
@@ -975,7 +994,7 @@ mod tests {
         let u = vector!(3, 4);
         let v = vector!(4, 3);
         let w = u%v;
-        println!("2*(u%v) = {}, {}", md!(2*w), u.z());
+        println!("|2*(u%v)| = {}, {}", md!(2*w), u.z());
         assert_eq!(2.*u*v, 48.);
     }
 
@@ -987,6 +1006,7 @@ mod tests {
         assert_eq!(f(2., 2.), 8.);
         assert_eq!(g(1., 2., 2.), 4.);
         println!("df/dx(2,2) = {:.6}", ddx!(f, 0, 2));
+        assert_eq!(limit!(f => 2, 3), 12.00000000005);
         assert_eq!(g.expression(), String::from("x.powi(2) * y + z"));
     }
 
@@ -1008,12 +1028,12 @@ mod tests {
     fn contours() {
         let sigma:ParametricCurve = curve!(t, t.powi(2), 2.*t);
         let space:Set = set![0., 2.*PI];
-        println!("sigma = {}, space = {}", sigma, space);
+        //println!("sigma = {}, space = {}", sigma, space);
 
         let c:Contour = contour!(t, t.cos(), t.sin(), 0, PI);
         println!("c(PI/2) = {}, dcdt(PI) = {}, where t is in {:?}", c(PI/2.), ddt!(c, PI), c.bounds());
 
         let s = contour!(sigma, space);
-        assert_eq!(s(1.), vector!(1., 2.));
+        assert_eq!(s(1.), vector!(1, 2));
     }
 }
