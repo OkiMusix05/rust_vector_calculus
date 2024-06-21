@@ -3,6 +3,7 @@ use std::fmt::{Display, Formatter};
 use dyn_clone::DynClone;
 
 const Δ:f64 = 5e-6;
+
 // ----- VECTORS -----
 #[derive(Copy, Clone)]
 pub struct Vector2 {
@@ -292,7 +293,7 @@ impl Function {
         }
     }
 }
-pub fn ddx(f:&Function, args:Vec<f64>) -> f64 {
+pub fn ddx_s(f:&Function, args:Vec<f64>) -> f64 {
     match f {
         Function::TwoD(f) => {
             (f.call(args[0] + Δ, args[1])-f.call(args[0], args[1]))/Δ
@@ -302,7 +303,7 @@ pub fn ddx(f:&Function, args:Vec<f64>) -> f64 {
         }
     }
 }
-pub fn ddy(f:&Function, args:Vec<f64>) -> f64 {
+pub fn ddy_s(f:&Function, args:Vec<f64>) -> f64 {
     match f {
         Function::TwoD(f) => {
             (f.call(args[0], args[1] + Δ)-f.call(args[0], args[1]))/Δ
@@ -312,7 +313,7 @@ pub fn ddy(f:&Function, args:Vec<f64>) -> f64 {
         }
     }
 }
-pub fn ddz(f:&Function, args:Vec<f64>) -> f64 {
+pub fn ddz_s(f:&Function, args:Vec<f64>) -> f64 {
     match f {
         Function::TwoD(_) => {
             panic!("Can't take partial with respect to z of a 2D function")
@@ -324,17 +325,17 @@ pub fn ddz(f:&Function, args:Vec<f64>) -> f64 {
 }
 #[macro_export]
 macro_rules! ddx {
-    ($f:expr, $x:expr, $y:expr) => {ddx(&$f, vec![$x as f64, $y as f64])};
-    ($f:expr, $x:expr, $y:expr, $z:expr) => {ddx(&$f, vec![$x as f64, $y as f64, $z as f64])};
+    ($f:expr, $x:expr, $y:expr) => {ddx_s(&$f, vec![$x as f64, $y as f64])};
+    ($f:expr, $x:expr, $y:expr, $z:expr) => {ddx_s(&$f, vec![$x as f64, $y as f64, $z as f64])};
 }
 #[macro_export]
 macro_rules! ddy {
-    ($f:expr, $x:expr, $y:expr) => {ddy(&$f, vec![$x as f64, $y as f64])};
-    ($f:expr, $x:expr, $y:expr, $z:expr) => {ddy(&$f, vec![$x as f64, $y as f64, $z as f64])};
+    ($f:expr, $x:expr, $y:expr) => {ddy_s(&$f, vec![$x as f64, $y as f64])};
+    ($f:expr, $x:expr, $y:expr, $z:expr) => {ddy_s(&$f, vec![$x as f64, $y as f64, $z as f64])};
 }
 #[macro_export]
 macro_rules! ddz {
-    ($f:expr, $x:expr, $y:expr, $z:expr) => {ddz(&$f, vec![$x as f64, $y as f64, $z as f64])};
+    ($f:expr, $x:expr, $y:expr, $z:expr) => {ddz_s(&$f, vec![$x as f64, $y as f64, $z as f64])};
 }
 impl Clone for Function {
     fn clone(&self) -> Function {
@@ -412,6 +413,245 @@ impl FnMut<(f64, f64, f64)> for Function {
     }
 }
 
+// ----- VECTOR FUNCTIONS -----
+pub struct VectorFunction2D {
+    pub f1:Box<dyn Fn(f64, f64) -> f64>,
+    pub expression_f1:String,
+    pub f2:Box<dyn Fn(f64, f64) -> f64>,
+    pub expression_f2:String
+}
+pub struct VectorFunction3D {
+    pub f1:Box<dyn Fn(f64, f64, f64) -> f64>,
+    pub expression_f1:String,
+    pub f2:Box<dyn Fn(f64, f64, f64) -> f64>,
+    pub expression_f2:String,
+    pub f3:Box<dyn Fn(f64, f64, f64) -> f64>,
+    pub expression_f3:String
+}
+pub enum VectorFunction {
+    TwoD(VectorFunction2D),
+    ThreeD(VectorFunction3D)
+}
+impl Display for VectorFunction {
+    fn fmt(&self, f: &mut Formatter<'_>) -> std::fmt::Result {
+        match self {
+            VectorFunction::TwoD(v) => {
+                write!(f, "⟨{:.5}, {:.5}⟩", v.expression_f1, v.expression_f2)
+            },
+            VectorFunction::ThreeD(v) => {
+                write!(f, "⟨{:.5}, {:.5}, {:.5}⟩", v.expression_f1, v.expression_f2, v.expression_f3)
+            }
+        }
+    }
+}
+#[macro_export]
+macro_rules! vector_function {
+    ($x:ident, $y:ident, $f1:expr, $f2:expr) => {
+        VectorFunction::TwoD(VectorFunction2D {
+            f1: Box::new(|$x:f64, $y:f64| $f1),
+            expression_f1: String::from(stringify!($f1)),
+            f2: Box::new(|$x:f64, $y:f64| $f2),
+            expression_f2: String::from(stringify!($f2))
+        })
+    };
+    ($x:ident, $y:ident, $z:ident, $f1:expr, $f2:expr, $f3:expr) => {
+        VectorFunction::ThreeD(VectorFunction3D {
+            f1: Box::new(|$x:f64, $y:f64, $z:f64| $f1),
+            expression_f1: String::from(stringify!($f1)),
+            f2: Box::new(|$x:f64, $y:f64, $z:f64| $f2),
+            expression_f2: String::from(stringify!($f2)),
+            f3: Box::new(|$x:f64, $y:f64, $z:f64| $f3),
+            expression_f3: String::from(stringify!($f3))
+        })
+    };
+}
+impl FnOnce<(f64, f64)> for VectorFunction {
+    type Output = Vector;
+
+    extern "rust-call" fn call_once(self, args: (f64, f64)) -> Self::Output {
+        match self {
+            VectorFunction::TwoD(v) => Vector::TwoD(Vector2::new((v.f1)(args.0, args.1), (v.f2)(args.0, args.1))),
+            VectorFunction::ThreeD(_) => panic!("3D vector function can't take 2 arguments")
+        }
+    }
+}
+impl Fn<(f64, f64)> for VectorFunction {
+    extern "rust-call" fn call(&self, args: (f64, f64)) -> Self::Output {
+        match self {
+            VectorFunction::TwoD(v) => Vector::TwoD(Vector2::new((v.f1)(args.0, args.1), (v.f2)(args.0, args.1))),
+            VectorFunction::ThreeD(_) => panic!("3D vector function can't take 2 arguments")
+        }
+    }
+}
+impl FnMut<(f64, f64)> for VectorFunction {
+    extern "rust-call" fn call_mut(&mut self, args: (f64, f64)) -> Self::Output {
+        match self {
+            VectorFunction::TwoD(v) => Vector::TwoD(Vector2::new((v.f1)(args.0, args.1), (v.f2)(args.0, args.1))),
+            VectorFunction::ThreeD(_) => panic!("3D vector function can't take 2 arguments")
+        }
+    }
+}
+impl FnOnce<(f64, f64, f64)> for VectorFunction {
+    type Output = Vector;
+
+    extern "rust-call" fn call_once(self, args: (f64, f64, f64)) -> Self::Output {
+        match self {
+            VectorFunction::TwoD(_) => panic!("2D vector function can't take 3 arguments"),
+            VectorFunction::ThreeD(v) => Vector::ThreeD(Vector3::new((v.f1)(args.0, args.1, args.2), (v.f2)(args.0, args.1, args.2), (v.f3)(args.0, args.1, args.2)))
+        }
+    }
+}
+impl Fn<(f64, f64, f64)> for VectorFunction {
+    extern "rust-call" fn call(&self, args: (f64, f64, f64)) -> Self::Output {
+        match self {
+            VectorFunction::TwoD(_) => panic!("2D vector function can't take 3 arguments"),
+            VectorFunction::ThreeD(v) => Vector::ThreeD(Vector3::new((v.f1)(args.0, args.1, args.2), (v.f2)(args.0, args.1, args.2), (v.f3)(args.0, args.1, args.2)))
+        }
+    }
+}
+impl FnMut<(f64, f64, f64)> for VectorFunction {
+    extern "rust-call" fn call_mut(&mut self, args: (f64, f64, f64)) -> Self::Output {
+        match self {
+            VectorFunction::TwoD(_) => panic!("2D vector function can't take 3 arguments"),
+            VectorFunction::ThreeD(v) => Vector::ThreeD(Vector3::new((v.f1)(args.0, args.1, args.2), (v.f2)(args.0, args.1, args.2), (v.f3)(args.0, args.1, args.2)))
+        }
+    }
+}
+// Partial Derivatives
+pub fn ddx_v(v:&VectorFunction, args:Vec<f64>) -> Vector {
+    match v {
+        VectorFunction::TwoD(v) => {
+            Vector::TwoD(Vector2::new(((v.f1)(args[0] + Δ, args[1])-(v.f1)(args[0], args[1]))/Δ,((v.f2)(args[0] + Δ, args[1])-(v.f2)(args[0], args[1]))/Δ))
+        },
+        VectorFunction::ThreeD(v) => {
+            Vector::TwoD(Vector2::new(((v.f1)(args[0] + Δ, args[1], args[2])-(v.f1)(args[0], args[1], args[2]))/Δ,((v.f2)(args[0] + Δ, args[1], args[2])-(v.f2)(args[0], args[1], args[2]))/Δ))
+        }
+    }
+}
+pub fn ddy_v(v:&VectorFunction, args:Vec<f64>) -> Vector {
+    match v {
+        VectorFunction::TwoD(v) => {
+            Vector::TwoD(Vector2::new(((v.f1)(args[0], args[1] + Δ)-(v.f1)(args[0], args[1]))/Δ,((v.f2)(args[0], args[1] + Δ)-(v.f2)(args[0], args[1]))/Δ))
+        },
+        VectorFunction::ThreeD(v) => {
+            Vector::TwoD(Vector2::new(((v.f1)(args[0], args[1] + Δ, args[2])-(v.f1)(args[0], args[1], args[2]))/Δ,((v.f2)(args[0], args[1] + Δ, args[2])-(v.f2)(args[0], args[1], args[2]))/Δ))
+        }
+    }
+}
+pub fn ddz_v(v:&VectorFunction, args:Vec<f64>) -> Vector {
+    match v {
+        VectorFunction::TwoD(_) => {
+            panic!("Can't take partial with respect to z of a 2D vector function")
+        },
+        VectorFunction::ThreeD(v) => {
+            Vector::TwoD(Vector2::new(((v.f1)(args[0], args[1], args[2] + Δ)-(v.f1)(args[0], args[1], args[2]))/Δ,((v.f2)(args[0], args[1], args[2] + Δ)-(v.f2)(args[0], args[1], args[2]))/Δ))
+        }
+    }
+}
+#[macro_export]
+macro_rules! dvdx {
+    ($f:expr, $x:expr, $y:expr) => {ddx_v(&$f, vec![$x as f64, $y as f64])};
+    ($f:expr, $x:expr, $y:expr, $z:expr) => {ddx_v(&$f, vec![$x as f64, $y as f64, $z as f64])};
+}
+#[macro_export]
+macro_rules! dvdy {
+    ($f:expr, $x:expr, $y:expr) => {ddy_v(&$f, vec![$x as f64, $y as f64])};
+    ($f:expr, $x:expr, $y:expr, $z:expr) => {ddy_v(&$f, vec![$x as f64, $y as f64, $z as f64])};
+}
+#[macro_export]
+macro_rules! dvdz {
+    ($f:expr, $x:expr, $y:expr, $z:expr) => {ddz_v(&$f, vec![$x as f64, $y as f64, $z as f64])};
+}
+// Curl
+pub fn curl(v:&VectorFunction, args:Vec<f64>) -> Vector {
+    match v {
+        VectorFunction::TwoD(_) => {
+            let (x, y) = (args[0], args[1]);
+            vector!(0, 0, ddx_v(v, vec![x, y]).y() - ddy_v(v, vec![x, y]).x())
+        },
+        VectorFunction::ThreeD(_) => {
+            let (x, y, z) = (args[0], args[1], args[2]);
+            vector!(ddy_v(v, vec![x, y, z]).z() - ddz_v(v, vec![x, y, z]).y(), ddz_v(v, vec![x, y, z]).x() - ddx_v(v, vec![x, y, z]).z(), ddx_v(v, vec![x, y, z]).y() - ddy_v(v, vec![x, y, z]).x())
+        },
+    }
+}
+#[macro_export]
+macro_rules! curl {
+    ($v:expr, $x:expr, $y:expr) => {
+        curl(&$v, vec![$x as f64, $y as f64])
+    };
+    ($v:expr, $x:expr, $y:expr, $z:expr) => {
+        curl(&$v, vec![$x as f64, $y as f64, $z as f64])
+    };
+}
+// Div
+pub fn div(v:&VectorFunction, args:Vec<f64>) -> f64 {
+    match v {
+        VectorFunction::TwoD(_) => {
+            let (x, y) = (args[0], args[1]);
+            ddx_v(v, vec![x, y]).x() + ddy_v(v, vec![x, y]).y()
+        },
+        VectorFunction::ThreeD(_) => {
+            let (x, y, z) = (args[0], args[1], args[2]);
+            ddx_v(v, vec![x, y, z]).x() + ddy_v(v, vec![x, y, z]).y() + ddz_v(v, vec![x, y, z]).z()
+        }
+    }
+}
+#[macro_export]
+macro_rules! div {
+    ($v:expr, $x:expr, $y:expr) => {
+        div(&$v, vec![$x as f64, $y as f64])
+    };
+    ($v:expr, $x:expr, $y:expr, $z:expr) => {
+        div(&$v, vec![$x as f64, $y as f64, $z as f64])
+    };
+}
+
+// ----- GRADIENT -----
+pub fn grad(f:&Function) -> VectorFunction {
+    match f {
+        Function::TwoD(_) => {
+            let f1 = f.clone();
+            let f2 = f.clone();
+            VectorFunction::TwoD(VectorFunction2D {
+                expression_f1: format!("ddx({})", f.expression()),
+                expression_f2: format!("ddy({})", f.expression()),
+                f1: Box::new(move |x:f64, y:f64| ddx_s(&f1, vec![x, y])),
+                f2: Box::new(move |x:f64, y:f64| ddy_s(&f2, vec![x, y]))
+            })
+        }
+        Function::ThreeD(_) => {
+            let f1 = f.clone();
+            let f2 = f.clone();
+            let f3 = f.clone();
+            VectorFunction::ThreeD(VectorFunction3D {
+                expression_f1: format!("ddx({})", f.expression()),
+                expression_f2: format!("ddy({})", f.expression()),
+                expression_f3: format!("ddz({})", f.expression()),
+                f1: Box::new(move |x:f64, y:f64, z:f64| ddx_s(&f1, vec![x, y, z])),
+                f2: Box::new(move |x:f64, y:f64, z:f64| ddy_s(&f2, vec![x, y, z])),
+                f3: Box::new(move |x:f64, y:f64, z:f64| ddz_s(&f3, vec![x, y, z])),
+            })
+        }
+    }
+}
+#[macro_export]
+macro_rules! grad {
+    ($f:expr) => {
+        grad(&$f)
+    }
+}
+
+// ----- PARAMETRIC CURVES -----
+
+// ----- SETS -----
+
+// ----- CONTOURS -----
+
+// ----- LIMITS -----
+
+// ----- LINE INTEGRAL -----
+
 #[cfg(test)]
 mod tests {
     use super::*;
@@ -425,7 +665,7 @@ mod tests {
         assert_eq!(2.*u*v, 48.);
     }
 
-    //noinspection ALL //This is for the squiggly lines when evaluating f and g
+    //noinspection ALL //This is for the squiggly lines when evaluating Functions
     #[test]
     fn scalar_functions() {
         let f:Function = f!(x, y, 2.*x*y);
@@ -436,8 +676,16 @@ mod tests {
         assert_eq!(g.expression(), String::from("x.powi(2) * y + z"));
     }
 
+    //noinspection ALL //This is for the squiggly lines when evaluating Vector Functions
     #[test]
     fn vector_functions() {
+        let F:VectorFunction = vector_function!(x, y, -y, x);
+        println!("F(1,2) = {:.5}", F(1., 2.));
+        println!("∂F/∂y = {}", dvdy!(F, 1, 2));
+        println!("|∇xF(1, 2)| = {:.5}", !curl!(F, 1, 2));
 
+        let g = f!(x, y, z, x + y +z);
+        let del_g = grad!(g);
+        println!("∇g(1, 2, 3) = {}", del_g(1., 2., 3.))
     }
 }
