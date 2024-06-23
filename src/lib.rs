@@ -234,11 +234,21 @@ macro_rules! md {
 }
 
 // ----- SCALAR FUNCTIONS -----
+pub trait F1DClone: DynClone + Fn(f64,) -> f64 {
+    fn call(&self, x: f64) -> f64;
+}
 pub trait F2DClone: DynClone + Fn(f64, f64) -> f64 {
     fn call(&self, x: f64, y: f64) -> f64;
 }
 pub trait F3DClone: DynClone + Fn(f64, f64, f64) -> f64 {
     fn call(&self, x: f64, y: f64, z:f64) -> f64;
+}
+impl<F> F1DClone for F
+    where F: 'static + Fn(f64,) -> f64 + Clone
+{
+    fn call(&self, x: f64) -> f64 {
+        self(x)
+    }
 }
 impl<F> F2DClone for F
     where F: 'static + Fn(f64, f64) -> f64 + Clone,
@@ -254,8 +264,18 @@ impl<F> F3DClone for F
         self(x, y, z)
     }
 }
+dyn_clone::clone_trait_object!(F1DClone<Output=f64>);
 dyn_clone::clone_trait_object!(F2DClone<Output=f64>);
 dyn_clone::clone_trait_object!(F3DClone<Output=f64>);
+pub struct Function1D {
+    pub f:Box<dyn F1DClone<Output=f64>>,
+    pub expression:String
+}
+impl Function1D {
+    fn call(&self, x:f64) -> f64 {
+        (self.f)(x)
+    }
+}
 pub struct Function2D {
     pub f:Box<dyn F2DClone<Output=f64>>,
     pub expression:String
@@ -272,6 +292,14 @@ pub struct Function3D {
 impl Function3D {
     fn call(&self, x:f64, y:f64, z:f64) -> f64 {
         (self.f)(x, y, z)
+    }
+}
+impl Clone for Function1D {
+    fn clone(&self) -> Function1D {
+        Function1D {
+            f: dyn_clone::clone_box(&*self.f),
+            expression: String::from(&*self.expression)
+        }
     }
 }
 impl Clone for Function2D {
@@ -291,12 +319,14 @@ impl Clone for Function3D {
     }
 }
 pub enum Function {
+    OneD(Function1D),
     TwoD(Function2D),
     ThreeD(Function3D)
 }
 impl Function {
     pub fn expression(&self) -> String {
         match self {
+            Function::OneD(f) => f.clone().expression,
             Function::TwoD(f) => f.clone().expression,
             Function::ThreeD(f) => f.clone().expression
         }
@@ -304,6 +334,9 @@ impl Function {
 }
 pub fn ddx_s(f:&Function, args:Vec<f64>) -> f64 {
     match f {
+        Function::OneD(f) => {
+            (f.call(args[0] + Δ)-f.call(args[0]))/Δ
+        }
         Function::TwoD(f) => {
             (f.call(args[0] + Δ, args[1])-f.call(args[0], args[1]))/Δ
         }
@@ -314,6 +347,9 @@ pub fn ddx_s(f:&Function, args:Vec<f64>) -> f64 {
 }
 pub fn ddy_s(f:&Function, args:Vec<f64>) -> f64 {
     match f {
+        Function::OneD(f) => {
+            panic!("Can't take partial with respect to y of a 1D function")
+        }
         Function::TwoD(f) => {
             (f.call(args[0], args[1] + Δ)-f.call(args[0], args[1]))/Δ
         }
@@ -324,6 +360,9 @@ pub fn ddy_s(f:&Function, args:Vec<f64>) -> f64 {
 }
 pub fn ddz_s(f:&Function, args:Vec<f64>) -> f64 {
     match f {
+        Function::OneD(f) => {
+            panic!("Can't take partial with respect to z of a 1D function")
+        }
         Function::TwoD(_) => {
             panic!("Can't take partial with respect to z of a 2D function")
         }
@@ -334,6 +373,7 @@ pub fn ddz_s(f:&Function, args:Vec<f64>) -> f64 {
 }
 #[macro_export]
 macro_rules! ddx {
+    ($f:expr, $x:expr) => {ddx_s(&$f, vec![$x as f64])};
     ($f:expr, $x:expr, $y:expr) => {ddx_s(&$f, vec![$x as f64, $y as f64])};
     ($f:expr, $x:expr, $y:expr, $z:expr) => {ddx_s(&$f, vec![$x as f64, $y as f64, $z as f64])};
 }
@@ -349,6 +389,7 @@ macro_rules! ddz {
 impl Clone for Function {
     fn clone(&self) -> Function {
         match self {
+            Function::OneD(f) => Function::OneD(f.clone()),
             Function::TwoD(f) => Function::TwoD(f.clone()),
             Function::ThreeD(f) => Function::ThreeD(f.clone())
         }
@@ -356,6 +397,12 @@ impl Clone for Function {
 }
 #[macro_export]
 macro_rules! f {
+    ($x:ident, $f:expr) => {
+        Function::OneD(Function1D {
+            f: Box::new(|$x:f64| $f),
+            expression: String::from(stringify!($f))
+        })
+    };
     ($x:ident, $y:ident, $f:expr) => {
         Function::TwoD(Function2D {
             f: Box::new(|$x:f64, $y:f64| $f),
@@ -369,11 +416,41 @@ macro_rules! f {
         })
     };
 }
+impl FnOnce<(f64,)> for Function {
+    type Output = f64;
+
+    extern "rust-call" fn call_once(self, args: (f64,)) -> Self::Output {
+        match self {
+            Function::OneD(f) => f.call(args.0),
+            Function::TwoD(_) => panic!("1D function can't take 2 arguments"),
+            Function::ThreeD(_) => panic!("1D function can't take 3 arguments")
+        }
+    }
+}
+impl Fn<(f64,)> for Function {
+    extern "rust-call" fn call(&self, args: (f64,)) -> Self::Output {
+        match self {
+            Function::OneD(f) => f.call(args.0),
+            Function::TwoD(_) => panic!("1D function can't take 2 arguments"),
+            Function::ThreeD(_) => panic!("1D function can't take 3 arguments")
+        }
+    }
+}
+impl FnMut<(f64,)> for Function {
+    extern "rust-call" fn call_mut(&mut self, args: (f64,)) -> Self::Output {
+        match self {
+            Function::OneD(f) => f.call(args.0),
+            Function::TwoD(_) => panic!("1D function can't take 2 arguments"),
+            Function::ThreeD(_) => panic!("1D function can't take 3 arguments")
+        }
+    }
+}
 impl FnOnce<(f64, f64)> for Function {
     type Output = f64;
 
     extern "rust-call" fn call_once(self, args: (f64, f64)) -> Self::Output {
         match self {
+            Function::OneD(_) => panic!("1D function can't take 2 arguments"),
             Function::TwoD(f) => f.call(args.0, args.1),
             Function::ThreeD(_) => panic!("3D function can't take 2 arguments")
         }
@@ -382,6 +459,7 @@ impl FnOnce<(f64, f64)> for Function {
 impl Fn<(f64, f64)> for Function {
     extern "rust-call" fn call(&self, args: (f64, f64)) -> Self::Output {
         match self {
+            Function::OneD(_) => panic!("1D function can't take 2 arguments"),
             Function::TwoD(f) => f.call(args.0, args.1),
             Function::ThreeD(_) => panic!("3D function can't take 2 arguments")
         }
@@ -390,6 +468,7 @@ impl Fn<(f64, f64)> for Function {
 impl FnMut<(f64, f64)> for Function {
     extern "rust-call" fn call_mut(&mut self, args: (f64, f64)) -> Self::Output {
         match self {
+            Function::OneD(_) => panic!("1D function can't take 2 arguments"),
             Function::TwoD(f) => f.call(args.0, args.1),
             Function::ThreeD(_) => panic!("3D function can't take 2 arguments")
         }
@@ -400,6 +479,7 @@ impl FnOnce<(f64, f64, f64)> for Function {
 
     extern "rust-call" fn call_once(self, args: (f64, f64, f64)) -> Self::Output {
         match self {
+            Function::OneD(_) => panic!("1D function can't take 2 arguments"),
             Function::TwoD(_) => panic!("2D function can't take 3 arguments"),
             Function::ThreeD(f) => f.call(args.0, args.1, args.2)
         }
@@ -408,6 +488,7 @@ impl FnOnce<(f64, f64, f64)> for Function {
 impl Fn<(f64, f64, f64)> for Function {
     extern "rust-call" fn call(&self, args: (f64, f64, f64)) -> Self::Output {
         match self {
+            Function::OneD(_) => panic!("1D function can't take 2 arguments"),
             Function::TwoD(_) => panic!("2D function can't take 3 arguments"),
             Function::ThreeD(f) => f.call(args.0, args.1, args.2)
         }
@@ -416,6 +497,7 @@ impl Fn<(f64, f64, f64)> for Function {
 impl FnMut<(f64, f64, f64)> for Function {
     extern "rust-call" fn call_mut(&mut self, args: (f64, f64, f64)) -> Self::Output {
         match self {
+            Function::OneD(_) => panic!("1D function can't take 2 arguments"),
             Function::TwoD(_) => panic!("2D function can't take 3 arguments"),
             Function::ThreeD(f) => f.call(args.0, args.1, args.2)
         }
@@ -426,6 +508,7 @@ impl FnOnce<(Vector,)> for Function {
 
     extern "rust-call" fn call_once(self, args: (Vector,)) -> Self::Output {
         match self {
+            Function::OneD(_) => panic!("1D function can't take a vector as an argument"),
             Function::TwoD(f) => {
                 match args.0 {
                     Vector::TwoD(v) => f.call(v.x, v.y),
@@ -444,6 +527,7 @@ impl FnOnce<(Vector,)> for Function {
 impl Fn<(Vector,)> for Function {
     extern "rust-call" fn call(&self, args: (Vector,)) -> Self::Output {
         match self {
+            Function::OneD(_) => panic!("1D function can't take a vector as an argument"),
             Function::TwoD(f) => {
                 match args.0 {
                     Vector::TwoD(v) => f.call(v.x, v.y),
@@ -462,6 +546,7 @@ impl Fn<(Vector,)> for Function {
 impl FnMut<(Vector,)> for Function {
     extern "rust-call" fn call_mut(&mut self, args: (Vector,)) -> Self::Output {
         match self {
+            Function::OneD(_) => panic!("1D function can't take a vector as an argument"),
             Function::TwoD(f) => {
                 match args.0 {
                     Vector::TwoD(v) => f.call(v.x, v.y),
@@ -481,6 +566,11 @@ impl FnMut<(Vector,)> for Function {
 // ----- LIMITS -----
 pub fn limit_s(f:&Function, args:Vec<f64>) -> f64 {
     match f {
+        Function::OneD(_) => {
+            let up = f(args[0] + Δ);
+            let down = f(args[0] - Δ);
+            (up + down)/2.
+        },
         Function::TwoD(_) => {
             let up = f(args[0] + Δ, args[1] + Δ);
             let down = f(args[0] - Δ, args[1] - Δ);
@@ -778,6 +868,7 @@ macro_rules! div {
 // ----- GRADIENT -----
 pub fn grad(f:&Function) -> VectorFunction {
     match f {
+        Function::OneD(_) => panic!("Gradient vector not defined for 1D function"),
         Function::TwoD(_) => {
             let f1 = f.clone();
             let f2 = f.clone();
@@ -1204,6 +1295,7 @@ impl Wrap for VectorFunction {
         _G::VectorFunction(&self)
     }
 }
+#[macro_export]
 macro_rules! line_integral {
     ($g:expr, $c:expr) => {
         line_integral($g.wrap(), &$c, IntegrationMethod::GaussLegendre)
@@ -1225,6 +1317,7 @@ pub fn line_integral(g:_G, c:&Contour, method:IntegrationMethod) -> f64 {
                         f(c(t))*!ddt!(c, t)
                     });
                 },
+                (Function::OneD(_), _) => panic!("For 1D functions, use the integral! macro"),
                 _ => panic!("No line integral of a 2D function over a 3D contour")
             }
         }
@@ -1295,6 +1388,27 @@ pub fn line_integral(g:_G, c:&Contour, method:IntegrationMethod) -> f64 {
         IntegrationMethod::Simpson13(n) => int_simpson13!(ft, t0, t1, n)
     }
 }
+macro_rules! integral {
+    ($f:expr, $s:expr) => {
+        integral_1d(&$f, &$s, IntegrationMethod::GaussLegendre)
+    };
+    ($f:expr, $a:expr, $b:expr) => {
+        integral_1d(&$f, &set![$a, $b], IntegrationMethod::GaussLegendre)
+    };
+    ($f:expr, $a:expr, $b:expr, $m:expr) => {
+        integral_1d(&$f, &set![$a, $b], $m)
+    };
+}
+pub fn integral_1d(f:&Function, set:&Set, method:IntegrationMethod) -> f64 {
+    match f {
+        Function::OneD(_) => match method {
+            IntegrationMethod::GaussLegendre => int_gauss_legendre!(f, set.i, set.f),
+            IntegrationMethod::Riemann(n) => int_riemann!(f, set.i, set.f, n),
+            IntegrationMethod::Simpson13(n) => int_simpson13!(f, set.i, set.f, n)
+        },
+        _ => panic!("For 2D and 3D scalar functions use the line_integral! macro")
+    }
+}
 
 
 use std::f64::consts::{PI, E};
@@ -1323,6 +1437,10 @@ mod tests {
         assert_eq!(limit!(f => 2, 3), 12.00000000005);
         assert_eq!(f(vector!(2, 3)), 12.);
         assert_eq!(g.expression(), String::from("x.powi(2) * y + z"));
+
+        let h = f!(x, 1./x);
+        assert!(near!(integral!(h, 1., E), 1.));
+        assert!(near!(ddx!(h, 2.), -1./4.));
     }
 
     //noinspection ALL //This is for the squiggly lines when evaluating Vector Functions

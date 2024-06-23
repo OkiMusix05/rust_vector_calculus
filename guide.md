@@ -25,7 +25,7 @@ To take the modulus of a vector, there are 3 ways:
 
 ## Scalar Functions
 
-You can also create scalar functions $f(x,y)$ or $f(x,y,z)$. For this, use the `f!` macro, which depending on the arguments you pass, the type of the function: $\mathbb{R}^2$ or $\mathbb{R}^3$.
+You can also create scalar functions $f(x)$, $f(x,y)$ or $f(x,y,z)$. For this, use the `f!` macro, which depending on the arguments you pass, the type of the function: $\mathbb{R}$, $\mathbb{R}^2$ or $\mathbb{R}^3$.
 
 ```rust
 let f:Function = f!(x, y, x*y);

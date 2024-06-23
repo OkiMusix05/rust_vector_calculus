@@ -12,6 +12,8 @@ implemented for vectors
 - v0.018 - Added limits for scalar functions
 - v0.02 - Evaluate scalar functions on vectors and line integrals for both
 scalar functions and vector functions, using Gauss-Legendre, Simpson 1/3 or Riemann.
+- v0.021 - Single variable scalar functions implemented, with derivatives and 
+the `integral!` macro
 # Usage
 To use the library, the project will have to be using the nightly toolchain,
 for which you can copy the "rust-toolchain.toml" file.\
