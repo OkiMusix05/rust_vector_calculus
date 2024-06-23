@@ -173,7 +173,7 @@ Where `f` can be either a `Function` or a `VectorFunction`, and `c` is a `Contou
 By default, line integrals use the Gauss-Legendre Quadrature, but if you’d like another integration method you can do so as such:
 
 ```rust
- let _:f64 = line_integral!(f, c, IntegrationMethod::Trapezoid);
+ let _:f64 = line_integral!(f, c, IntegrationMethod::Simpson13);
 ```
 
 where `IntegrationMethod` is an enum that provides the following methods
