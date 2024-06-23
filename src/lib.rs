@@ -1,6 +1,8 @@
 #![feature(unboxed_closures, fn_traits)]
 use std::fmt::{Display, Formatter};
 use dyn_clone::DynClone;
+use std::cmp::{min, max};
+use rand::Rng;
 
 const Δ:f64 = 5e-6;
 
@@ -1040,6 +1042,19 @@ macro_rules! ddt {
 }
 
 // ----- SETS -----
+trait Super {
+    fn wrap(&self) -> SuperSet;
+}
+impl Super for Set {
+    fn wrap(&self) -> SuperSet {
+        SuperSet::Set(self)
+    }
+}
+impl Super for FSet {
+    fn wrap(&self) -> SuperSet {
+        SuperSet::FSet(self)
+    }
+}
 #[derive(Copy, Clone)]
 pub struct Set {
     pub i:f64,
@@ -1055,6 +1070,27 @@ impl Set {
         space
     }
 }
+#[derive(Clone)]
+pub struct FSet {
+    pub i:Function,
+    pub f:Function,
+}
+impl FSet {
+    fn new(i:Function, f:Function) -> Self {
+        match (&i, &f) {
+            (Function::OneD(_), Function::OneD(_)) |
+            (Function::TwoD(_), Function::TwoD(_)) => {
+                FSet { i, f }
+            },
+            (Function::ThreeD(_), Function::ThreeD(_)) => panic!("Functions can't be of dimension 3"),
+            (_, _) => panic!("Functions must be of the same dimension")
+        }
+    }
+}
+enum SuperSet<'s> {
+    Set(&'s Set),
+    FSet(&'s FSet)
+}
 #[macro_export]
 macro_rules! set {
     ($i:expr, $f:expr) => {Set {
@@ -1062,9 +1098,17 @@ macro_rules! set {
         f: $f as f64
     }};
 }
+macro_rules! fset {
+    ($fi:expr, $ff:expr) => {FSet::new($fi, $ff)};
+}
 impl Display for Set {
     fn fmt(&self, f: &mut Formatter<'_>) -> std::fmt::Result {
         write!(f, "[{:.5}, {:.5}]", self.i, self.f)
+    }
+}
+impl Display for FSet {
+    fn fmt(&self, f: &mut Formatter<'_>) -> std::fmt::Result {
+        write!(f, "[{}, {}]", self.i.expression(), self.f.expression())
     }
 }
 
@@ -1410,8 +1454,52 @@ pub fn integral_1d(f:&Function, set:&Set, method:IntegrationMethod) -> f64 {
     }
 }
 
-// ----- DOUBLE INTEGRAL -----
-
+// ----- DOUBLE/TRIPLE INTEGRAL -----
+pub fn rn_integral(f:&Function, lim:Vec<SuperSet>, n:i32) -> f64 {
+    let mut rng = rand::thread_rng();
+    match (f, lim.len()) {
+        (Function::TwoD(_), 2) => {
+            match (&lim[0], &lim[1]) {
+                (SuperSet::Set(a), SuperSet::Set(b)) => {
+                    let mut sum = 0.0;
+                    for _ in 0..n {
+                        let x = rng.gen_range(a.i..a.f);
+                        let y = rng.gen_range(b.i..b.f);
+                        sum += f(x, y);
+                    }
+                    return (sum / n as f64) * (a.f - a.i) * (b.f - b.i);
+                }
+                (SuperSet::Set(a), SuperSet::FSet(b)) => {
+                    if let Function::OneD(_) = b.i {
+                        let mut sum = 0.0;
+                        for _ in 0..n {
+                            let x = rng.gen_range(a.i..a.f);
+                            let y = rng.gen_range((b.i)(x)..(b.f)(x));
+                            sum += f(x, y);
+                        }
+                        return sum / ((a.f - a.i) * n as f64);
+                    } else { panic!("Function limits for this double integral need to be 1D") }
+                },
+                (SuperSet::FSet(a), SuperSet::Set(b)) => {
+                    if let Function::OneD(_) = a.i {
+                        let mut sum = 0.0;
+                        for _ in 0..n {
+                            let y = rng.gen_range(b.i..b.f);
+                            let x = rng.gen_range((a.i)(y)..(a.f)(y));
+                            sum += f(x, y);
+                        }
+                        return sum / ((b.f - b.i) * n as f64);
+                    } else { panic!("Function limits for this double integral need to be 1D") }
+                },
+                (_, _) => panic!("Both integral limits can't be functions")
+            }
+        },
+        (Function::ThreeD(f), 3) => {
+            f64::NAN
+        },
+        (_, _) => panic!("Fak")
+    }
+}
 
 // ----- SURFACES -----
 pub struct ParametricSurface { // All supposed to be Function2D
@@ -1525,7 +1613,6 @@ use std::f64::consts::{PI, E};
 #[cfg(test)]
 mod tests {
     use super::*;
-
     #[test]
     fn vectors() {
         let u = vector!(3, 4);
@@ -1535,7 +1622,6 @@ mod tests {
         //assert_eq!(vector!(0.0, 0.0), vector!(-0.0, -0.0));
         assert_eq!(2.*u*v, 48.);
     }
-
     //noinspection ALL //This is for the squiggly lines when evaluating Functions
     #[test]
     fn scalar_functions() {
@@ -1552,7 +1638,6 @@ mod tests {
         assert!(near!(integral!(h, 1., E), 1.));
         assert!(near!(ddx!(h, 2.), -1./4.));
     }
-
     //noinspection ALL //This is for the squiggly lines when evaluating Vector Functions
     #[test]
     fn vector_functions() {
@@ -1566,7 +1651,6 @@ mod tests {
         println!("∇g(1, 2, 3) = {}", del_g(1., 2., 3.));
         assert_eq!(del_g.potential(vec![1., 2., 3.]), g(1., 2., 3.));
     }
-
     #[test]
     fn contours() {
         let sigma:ParametricCurve = curve!(t, t.powi(2), 2.*t);
@@ -1579,7 +1663,6 @@ mod tests {
         let s = contour!(sigma, space);
         assert_eq!(s(1.), vector!(1, 2));
     }
-
     #[test]
     fn line_integrals() {
         let g = vector_function!(x, y, 2.*x*y.cos(), -x.powi(2)*y.sin());
@@ -1591,8 +1674,17 @@ mod tests {
         assert!(near!(line_integral!(f, c), 1./3.))
     }
     #[test]
+    fn rn_integrals() {
+        let f = f!(x, y, x.powi(2)*y);
+        let a = set![0, 1];
+        let b = fset![f!(x, 0.), f!(x, x.powi(2))];
+        let c = fset![f!(y, y.sqrt()), f!(y, 1.)];
+        let d = set![0, 1];
+        println!("Integral = {}", rn_integral(&f, vec![a.wrap(), b.wrap()], 501));
+    }
+    #[test]
     fn surfaces() {
         let s:Surface = surface!(u, v, u.sin()*v.cos(), u.sin()*v.sin(), u.cos(), 0, PI/2., 0, 2.*PI);
-        println!("s(PI, PI/2) = {}", s(PI, PI/2.));
+        assert!(near_v!(s(PI, PI/2.), vector!(0, 0, -1)));
     }
 }
