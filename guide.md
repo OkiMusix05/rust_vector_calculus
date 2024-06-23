@@ -33,8 +33,7 @@ let g:Function = f!(x, y, z, x.powi(2)*y + z);
 let _:f64 = g(1., 2., 2.);
 ```
 
-When you create a scalar function, the expression is automatically saved as a string, which you can access as `f.expression()` , and functions can be cloned with `f.clone()`. To evaluate a function, run `f(1.,2.)`, for example, which means these evaluate like regular Rust functions.
-
+When you create a scalar function, the expression is automatically saved as a string, which you can access as `f.expression()` , and functions can be cloned with `f.clone()`. To evaluate a function, run `f(1.,2.)`, for example, which means these evaluate like regular Rust functions — it’s worth noting that aside from that, you can also pass a `Vector` as argument to a scalar function and it will evaluate perfectly as long as the dimensions match.
 You can evaluate its partial derivatives too with the respective macro, like `ddx!`  for $\frac{\partial}{\partial x}$, and similarly for $y$, except for $z$ in an $\mathbb{R}^2$ function, which will panic.
 
 ```rust
@@ -87,7 +86,7 @@ let G:VectorFunction = vector_function!(x, y, z, 2.*z, x.sqrt(), x + y);
 
 where the first parameters are the variables to use, and the last ones are the expressions for its component functions.
 
-These functions also encode their component scalar functions as strings, and you can access them as `F.expression_f1` and similarily for $f_2$ and $f_3$; they also evaluate like regular Rust functions.
+These functions also encode their component scalar functions as strings, and you can access them as `F.expression_f1` and similarily for $f_2$ and $f_3$; they also evaluate like regular Rust functions, as well as evaluating on Vectors, like `F(v)`  if `v:Vector`.
 
 Vector Functions also have methods to take their partial derivatives, although they’re named slightly differently, as the macros `dvdy!` where you can see the *v* added to indicate it is the partial derivative of a vector function. The more important methods, however, are *curl* and *div*, which also have their respective macros representing the operations $\nabla\times F$ and $\nabla\cdot F$.
 
@@ -156,3 +155,43 @@ Contours, like parametric curves, also have a derivative `ddt` method, and the s
 Added to that, contours have a `c.bounds()` method that returns a tuple with two elements containing the start and end of the set.
 
 Note: Contours are also evaluated like regular rust functions (`c(PI/2.)`) and return Vectors like parametric curves.
+
+## Line Integrals
+
+$$
+\int_C F(x,y)\cdot ds
+$$
+
+Line integrals provide a way to integrate scalar or vector functions over the path of a contour. To do this, you can use the following macro
+
+```rust
+let _:f64 = line_integral!(f, c)
+```
+
+Where `f` can be either a `Function` or a `VectorFunction`, and `c` is a `Contour` of the apropiate dimention. However, it is possible to integrate a 3D vector field over a 2D contour.
+
+By default, line integrals use the Gauss-Legendre Quadrature, but if you’d like another integration method you can do so as such:
+
+```rust
+ let _:f64 = line_integral!(f, c, IntegrationMethod::Trapezoid);
+```
+
+where `IntegrationMethod` is an enum that provides the following methods
+
+| Method | Description |
+| --- | --- |
+| Riemann | The classic one — you need to provide $n$: the number of partitions |
+| Simpson 1/3 | The more accurate one — also needs an $n$ (has to be even) |
+| Gauss-Legendre | The faster one, done with 5 points |
+
+Note: If the vector function came from using the `grad!` macro, the line integral will automatically be computed using its potential function, as per the fundamental theorem of line integrals
+
+$$
+\oint_\sigma\nabla f\cdot ds=f(\sigma(t_1))-f(\sigma(t_0))
+$$
+
+If, however, the vector function comes from a gradient but it wasn’t obtained through the `grad!` macro (done by checking its curl), and $\sigma(t_1)=\sigma(t_0)$, by this same theorem the line integral will return 0.
+
+$$
+\oint_\sigma\nabla f\cdot ds = 0
+$$

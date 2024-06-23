@@ -421,6 +421,62 @@ impl FnMut<(f64, f64, f64)> for Function {
         }
     }
 }
+impl FnOnce<(Vector,)> for Function {
+    type Output = f64;
+
+    extern "rust-call" fn call_once(self, args: (Vector,)) -> Self::Output {
+        match self {
+            Function::TwoD(f) => {
+                match args.0 {
+                    Vector::TwoD(v) => f.call(v.x, v.y),
+                    Vector::ThreeD(_) => panic!("3D vector passed to 2D function")
+                }
+            },
+            Function::ThreeD(f) => {
+                match args.0 {
+                    Vector::TwoD(v) => f.call(v.x, v.y, 0.),// panic!("2D vector passed to 3D function"),
+                    Vector::ThreeD(v) => f.call(v.x, v.y, v.z)
+                }
+            }
+        }
+    }
+}
+impl Fn<(Vector,)> for Function {
+    extern "rust-call" fn call(&self, args: (Vector,)) -> Self::Output {
+        match self {
+            Function::TwoD(f) => {
+                match args.0 {
+                    Vector::TwoD(v) => f.call(v.x, v.y),
+                    Vector::ThreeD(_) => panic!("3D vector passed to 2D function")
+                }
+            },
+            Function::ThreeD(f) => {
+                match args.0 {
+                    Vector::TwoD(_) => panic!("2D vector passed to 3D function"),
+                    Vector::ThreeD(v) => f.call(v.x, v.y, v.z)
+                }
+            }
+        }
+    }
+}
+impl FnMut<(Vector,)> for Function {
+    extern "rust-call" fn call_mut(&mut self, args: (Vector,)) -> Self::Output {
+        match self {
+            Function::TwoD(f) => {
+                match args.0 {
+                    Vector::TwoD(v) => f.call(v.x, v.y),
+                    Vector::ThreeD(_) => panic!("3D vector passed to 2D function")
+                }
+            },
+            Function::ThreeD(f) => {
+                match args.0 {
+                    Vector::TwoD(_) => panic!("2D vector passed to 3D function"),
+                    Vector::ThreeD(v) => f.call(v.x, v.y, v.z)
+                }
+            }
+        }
+    }
+}
 
 // ----- LIMITS -----
 pub fn limit_s(f:&Function, args:Vec<f64>) -> f64 {
@@ -570,6 +626,62 @@ impl FnMut<(f64, f64, f64)> for VectorFunction {
         match self {
             VectorFunction::TwoD(_) => panic!("2D vector function can't take 3 arguments"),
             VectorFunction::ThreeD(v) => Vector::ThreeD(Vector3::new((v.f1)(args.0, args.1, args.2), (v.f2)(args.0, args.1, args.2), (v.f3)(args.0, args.1, args.2)))
+        }
+    }
+}
+impl FnOnce<(Vector,)> for VectorFunction {
+    type Output = Vector;
+
+    extern "rust-call" fn call_once(self, args: (Vector,)) -> Self::Output {
+        match self {
+            VectorFunction::TwoD(f) => {
+                match args.0 {
+                    Vector::TwoD(v) => Vector::TwoD(Vector2::new((f.f1)(v.x, v.y), (f.f2)(v.x, v.y))),
+                    Vector::ThreeD(_) => panic!("3D vector passed to 2D vector function")
+                }
+            }
+            VectorFunction::ThreeD(f) => {
+                match args.0 {
+                    Vector::TwoD(v) => Vector::ThreeD(Vector3::new((f.f1)(v.x, v.y, 0.), (f.f2)(v.x, v.y, 0.), (f.f3)(v.x, v.y, 0.))),
+                    Vector::ThreeD(v) => Vector::ThreeD(Vector3::new((f.f1)(v.x, v.y, v.z), (f.f2)(v.x, v.y, v.z), (f.f3)(v.x, v.y, v.z)))
+                }
+            }
+        }
+    }
+}
+impl Fn<(Vector,)> for VectorFunction {
+    extern "rust-call" fn call(&self, args: (Vector,)) -> Self::Output {
+        match self {
+            VectorFunction::TwoD(f) => {
+                match args.0 {
+                    Vector::TwoD(v) => Vector::TwoD(Vector2::new((f.f1)(v.x, v.y), (f.f2)(v.x, v.y))),
+                    Vector::ThreeD(_) => panic!("3D vector passed to 2D vector function")
+                }
+            }
+            VectorFunction::ThreeD(f) => {
+                match args.0 {
+                    Vector::TwoD(v) => Vector::ThreeD(Vector3::new((f.f1)(v.x, v.y, 0.), (f.f2)(v.x, v.y, 0.), (f.f3)(v.x, v.y, 0.))),
+                    Vector::ThreeD(v) => Vector::ThreeD(Vector3::new((f.f1)(v.x, v.y, v.z), (f.f2)(v.x, v.y, v.z), (f.f3)(v.x, v.y, v.z)))
+                }
+            }
+        }
+    }
+}
+impl FnMut<(Vector,)> for VectorFunction {
+    extern "rust-call" fn call_mut(&mut self, args: (Vector,)) -> Self::Output {
+        match self {
+            VectorFunction::TwoD(f) => {
+                match args.0 {
+                    Vector::TwoD(v) => Vector::TwoD(Vector2::new((f.f1)(v.x, v.y), (f.f2)(v.x, v.y))),
+                    Vector::ThreeD(_) => panic!("3D vector passed to 2D vector function")
+                }
+            }
+            VectorFunction::ThreeD(f) => {
+                match args.0 {
+                    Vector::TwoD(v) => Vector::ThreeD(Vector3::new((f.f1)(v.x, v.y, 0.), (f.f2)(v.x, v.y, 0.), (f.f3)(v.x, v.y, 0.))),
+                    Vector::ThreeD(v) => Vector::ThreeD(Vector3::new((f.f1)(v.x, v.y, v.z), (f.f2)(v.x, v.y, v.z), (f.f3)(v.x, v.y, v.z)))
+                }
+            }
         }
     }
 }
@@ -983,8 +1095,209 @@ impl Fn<(f64,)> for Contour {
 // The ddt macro also works for Contours
 
 // ----- LINE INTEGRAL -----
+pub fn type_of<T>(_: &T) -> &str {
+    std::any::type_name::<T>().split("::").collect::<Vec<&str>>().last().unwrap()
+}
+#[macro_export]
+macro_rules! near {
+    ($a:expr, $b:expr) => {
+        $a > $b - 2.*Δ && $a < $b + 2.*Δ
+    };
+    ($a:expr, $b:expr; $e:expr) => {
+        $a > $b - $e && $a < $b + $e
+    };
+}
+#[macro_export]
+macro_rules! near_v {
+    ($u:expr, $v:expr) => {
+        match ($u, $v) {
+            (Vector::TwoD(u), Vector::TwoD(v)) => {
+                near!(u.x, v.x) && near!(u.y, v.y)
+            },
+            (Vector::ThreeD(u), Vector::ThreeD(v)) => {
+                near!(u.x, v.x) && near!(u.y, v.y) && near!(u.z, v.z)
+            },
+            (Vector::TwoD(u), Vector::ThreeD(v)) => {
+                near!(u.x, v.x) && near!(u.y, v.y) && near!(0.0, v.z)
+            },
+            (Vector::ThreeD(u), Vector::TwoD(v)) => {
+                near!(u.x, v.x) && near!(u.y, v.y) && near!(u.z, 0.0)
+            }
+        }
+    };
+    ($u:expr, $v:expr; $e:expr) => {
+        match ($u, $v) {
+            (Vector::TwoD(u), Vector::TwoD(v)) => {
+                near!(u.x, v.x; $e) && near!(u.y, v.y; $e)
+            },
+            (Vector::ThreeD(u), Vector::ThreeD(v)) => {
+                near!(u.x, v.x; $e) && near!(u.y, v.y; $e) && near!(u.z, v.z; $e)
+            },
+            (Vector::TwoD(u), Vector::ThreeD(v)) => {
+                near!(u.x, v.x; $e) && near!(u.y, v.y; $e) && near!(0.0, v.z; $e)
+            },
+            (Vector::ThreeD(u), Vector::TwoD(v)) => {
+                near!(u.x, v.x; $e) && near!(u.y, v.y; $e) && near!(u.z, 0.0; $e)
+            },
+        }
+    };
+}
+pub enum IntegrationMethod {
+    GaussLegendre,
+    Riemann(i32),
+    Simpson13(i32),
+}
+macro_rules! int_gauss_legendre {
+    ($ft:expr, $t0:expr, $t1:expr) => {{
+        let t = ($t0 + $t1)/2.;
+        let dt = ($t1 - $t0)/2.;
+        let w1 = 128f64/225f64;
+        let w2 = (322f64+13f64*70f64.sqrt())/900f64;
+        let w3 = (322f64-13f64*70f64.sqrt())/900f64;
+        let x2 = (1f64/3f64)*(5f64-2f64*(10f64/7f64).sqrt()).sqrt()*dt;
+        let x3 = (1f64/3f64)*(5f64+2f64*(10f64/7f64).sqrt()).sqrt()*dt;
+        return w1*$ft(t + 0.0)*dt + w2*($ft(t - x2)*dt+$ft(t + x2)*dt) + w3*($ft(t - x3)*dt+$ft(t + x3)*dt);
+    }};
+}
+macro_rules! int_riemann {
+    ($ft:expr, $t0:expr, $t1:expr, $n:expr) => {{
+        let δ:f64 = ($t1-$t0)/($n as f64);
+        let mut sum:f64 = 0.;
+        for i in 0..$n {
+            sum += $ft($t0 + δ*i as f64)
+        }
+        return sum*δ;
+    }};
+}
+macro_rules! int_simpson13 {
+    ($ft:expr, $t0:expr, $t1:expr, $n:expr) => {{
+        if $n%2 != 0 { panic!("Simpson's n has to be even") }
+            let δ:f64 = ($t1-$t0)/($n as f64);
+            let mut sum:f64 = 0.;
+            let mut xi:f64;
+            for i in 1..$n {
+                xi = $t0 + i as f64 * δ;
+                if i%2 != 0 {
+                    sum += 4.0*$ft(xi);
+                } else {
+                    sum += 2.0*$ft(xi);
+                }
+            }
+            1./3. * δ * ($ft($t0) + $ft($t1) + sum)
+    }};
+}
+// General Function Wrapper
+enum _G<'s> {
+    Function(&'s Function),
+    VectorFunction(&'s VectorFunction)
+}
+trait Wrap {
+    fn wrap(&self) -> _G;
+} // Wrapper for General Function
+impl Wrap for Function {
+    fn wrap(&self) -> _G {
+        _G::Function(self)
+    }
+}
+impl Wrap for VectorFunction {
+    fn wrap(&self) -> _G {
+        _G::VectorFunction(&self)
+    }
+}
+macro_rules! line_integral {
+    ($g:expr, $c:expr) => {
+        line_integral($g.wrap(), &$c, IntegrationMethod::GaussLegendre)
+    };
+    ($g:expr, $c:expr, $m:expr) => {
+        line_integral($g.wrap(), &$c, $m)
+    };
+}
+pub fn line_integral(g:_G, c:&Contour, method:IntegrationMethod) -> f64 {
+    let (t0, t1) = c.bounds();
+    let mut ft:Box<dyn Fn(f64)->f64> = Box::new(|_:f64| f64::NAN);
+    match g {
+        _G::Function(f) => {
+            match (f, c) {
+                (Function::TwoD(_), Contour::TwoD(_)) |
+                (Function::ThreeD(_), Contour::ThreeD(_)) |
+                (Function::ThreeD(_), Contour::TwoD(_)) => {
+                    ft = Box::new(move |t:f64| {
+                        f(c(t))*!ddt!(c, t)
+                    });
+                },
+                _ => panic!("No line integral of a 2D function over a 3D contour")
+            }
+        }
+        _G::VectorFunction(v) => {
+            let (c1,c0) = (c(t1), c(t0));
+            let (half, third) = ((71./67.)*((t1-t0)/2.), (129./131.)*((t1-t0)/3.));
+            match v {
+                VectorFunction::TwoD(vf) => {
+                    match c {
+                        Contour::TwoD(_) => {
+                            if let Some(f) = vf.potential.clone() {
+                                if near_v!(c1, c0; Δ*1e-7) {
+                                    return 0.
+                                } else {
+                                    return f(c1) - f(c0);
+                                }
+                            } else {
+                                let (half, third) = (!curl!(v, c(half).x(), c(half).y()), !curl!(v, c(third).x(), c(third).y()));
+                                if near!(half, 0.0) && near!(third, 0.0) && near_v!(c1, c0){
+                                    return 0.
+                                } else {
+                                    ft = Box::new(move |t:f64| {
+                                        return v(c(t))*ddt!(c, t)
+                                    });
+                                }
+                            }
+                        },
+                        Contour::ThreeD(_) => panic!("Line integral of a 3D contour on a 2D vector function")
+                    }
+                }
+                VectorFunction::ThreeD(vf) => {
+                    if let Some(f) = vf.potential.clone() {
+                        if near_v!(c1, c0; Δ*1e-7) {
+                            return 0.
+                        } else {
+                            return f(c1) - f(c0);
+                        }
+                    }
+                    match c {
+                        Contour::TwoD(_) => {
+                            let (half, third) = (!curl!(v, c(half).x(), c(half).y(), 0.), !curl!(v, c(third).x(), c(third).y(), 0.));
+                            if near!(half, 0.0) && near!(third, 0.0) && near_v!(c1, c0){
+                                return 0.
+                            } else {
+                                ft = Box::new(move |t:f64| {
+                                    return v(c(t))*ddt!(c, t)
+                                });
+                            }
+                        }
+                        Contour::ThreeD(_) => {
+                            let (half, third) = (!curl!(v, c(half).x(), c(half).y(), c(half).z()), !curl!(v, c(third).x(), c(third).y(), c(third).z()));
+                            if near!(half, 0.0) && near!(third, 0.0) && near_v!(c1, c0){
+                                return 0.
+                            } else {
+                                ft = Box::new(move |t:f64| {
+                                    return v(c(t))*ddt!(c, t)
+                                });
+                            }
+                        }
+                    }
+                }
+            }
+        }
+    }
+    return match method {
+        IntegrationMethod::GaussLegendre => int_gauss_legendre!(ft, t0, t1),
+        IntegrationMethod::Riemann(n) => int_riemann!(ft, t0, t1, n),
+        IntegrationMethod::Simpson13(n) => int_simpson13!(ft, t0, t1, n)
+    }
+}
 
-use std::f64::consts::PI;
+
+use std::f64::consts::{PI, E};
 #[cfg(test)]
 mod tests {
     use super::*;
@@ -995,6 +1308,7 @@ mod tests {
         let v = vector!(4, 3);
         let w = u%v;
         println!("|2*(u%v)| = {}, {}", md!(2*w), u.z());
+        //assert_eq!(vector!(0.0, 0.0), vector!(-0.0, -0.0));
         assert_eq!(2.*u*v, 48.);
     }
 
@@ -1007,6 +1321,7 @@ mod tests {
         assert_eq!(g(1., 2., 2.), 4.);
         println!("df/dx(2,2) = {:.6}", ddx!(f, 0, 2));
         assert_eq!(limit!(f => 2, 3), 12.00000000005);
+        assert_eq!(f(vector!(2, 3)), 12.);
         assert_eq!(g.expression(), String::from("x.powi(2) * y + z"));
     }
 
@@ -1021,7 +1336,7 @@ mod tests {
         let g = f!(x, y, z, x + y +z);
         let del_g = grad!(g);
         println!("∇g(1, 2, 3) = {}", del_g(1., 2., 3.));
-        //assert_eq!(del_g.potential(vec![1., 2., 3.]), g(1., 2., 3.));
+        assert_eq!(del_g.potential(vec![1., 2., 3.]), g(1., 2., 3.));
     }
 
     #[test]
@@ -1035,5 +1350,16 @@ mod tests {
 
         let s = contour!(sigma, space);
         assert_eq!(s(1.), vector!(1, 2));
+    }
+
+    #[test]
+    fn line_integrals() {
+        let g = vector_function!(x, y, 2.*x*y.cos(), -x.powi(2)*y.sin());
+        let sigma = contour!(t, (t-1.).exp(), (PI/t).sin(), 1, 2);
+        assert!(near!(line_integral!(g, sigma, IntegrationMethod::Simpson13(400)), E.powi(2)*1.0_f64.cos()-1.; 1e-4));
+
+        let f = f!(x, y, x.powi(2)*y);
+        let c = contour!(t, t.cos(), t.sin(), 0, PI/2.);
+        assert!(near!(line_integral!(f, c), 1./3.))
     }
 }

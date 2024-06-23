@@ -1,4 +1,4 @@
-#![feature(unboxed_closures, fn_traits)]
+/*#![feature(unboxed_closures, fn_traits)]
 
 use std::fmt::{Display, Formatter};
 use dyn_clone::DynClone;
@@ -790,8 +790,113 @@ fn main() {
     println!("C = {}", c);
     println!("∫cF·ds = {:.5}", work);
 
-}
+}*/
+// First: 21.136721774912168
+// Second:
+// Real: 22.4399060659
+/*
+            c = 1.0/3.0;
+            for i in 1..n {
+                xi = a + i as f64 * h;
+                if i%2 != 0 {
+                    sum += 4.0*func(xi);
+                } else {
+                    sum += 2.0*func(xi);
+                }
+            }
+            c * h * (func(a) + func(b) + sum)
+*/
 
 /*
 dyn-clone = "1.0.17"
+*/
+
+// OLD LINE INTEGRAL FUNCTIONS
+/*
+pub fn line_integral_v(v:&VectorFunction, c:&Contour, method:IntegrationMethod) -> f64 {
+    let (t0, t1) = c.bounds();
+    let (c1, c0) = (c(t1), c(t0));
+    let (half, third) = ((71./67.)*((t1-t0)/2.), (129./131.)*((t1-t0)/3.));
+    let ft:Box<dyn Fn(f64)->f64>;
+    match v {
+        VectorFunction::TwoD(vf) => {
+            match c {
+                Contour::TwoD(_) => {
+                    if let Some(f) = vf.potential.clone() {
+                        if near_v!(c1, c0; Δ*1e-5) {
+                            return 0.
+                        } else {
+                            return f(c1) - f(c0);
+                        }
+                    } else {
+                        let (half, third) = (!curl!(v, c(half).x(), c(half).y()), !curl!(v, c(third).x(), c(third).y()));
+                        if near!(half, 0.0) && near!(third, 0.0) && near_v!(c1, c0){
+                            return 0.
+                        } else {
+                            ft = Box::new(move |t:f64| {
+                                return v(c(t))*ddt!(c, t)
+                            });
+                        }
+                    }
+                },
+                Contour::ThreeD(_) => panic!("Line integral of a 3D contour on a 2D vector function")
+            }
+        }
+        VectorFunction::ThreeD(vf) => {
+            if let Some(f) = vf.potential.clone() {
+                if near_v!(c1, c0; Δ*1e-5) {
+                    return 0.
+                } else {
+                    return f(c1) - f(c0);
+                }
+            }
+            match c {
+                Contour::TwoD(_) => {
+                    let (half, third) = (!curl!(v, c(half).x(), c(half).y(), 0.), !curl!(v, c(third).x(), c(third).y(), 0.));
+                    if near!(half, 0.0) && near!(third, 0.0) && near_v!(c1, c0){
+                        return 0.
+                    } else {
+                        ft = Box::new(move |t:f64| {
+                            return v(c(t))*ddt!(c, t)
+                        });
+                    }
+                }
+                Contour::ThreeD(_) => {
+                    let (half, third) = (!curl!(v, c(half).x(), c(half).y(), c(half).z()), !curl!(v, c(third).x(), c(third).y(), c(third).z()));
+                    if near!(half, 0.0) && near!(third, 0.0) && near_v!(c1, c0){
+                        return 0.
+                    } else {
+                        ft = Box::new(move |t:f64| {
+                            return v(c(t))*ddt!(c, t)
+                        });
+                    }
+                }
+            }
+        }
+    }
+    match method {
+        IntegrationMethod::GaussLegendre => int_gauss_legendre!(ft, t0, t1),
+        IntegrationMethod::Riemann(n) => int_riemann!(ft, t0, t1, n),
+        IntegrationMethod::Simpson13(n) => int_simpson13!(ft, t0, t1, n)
+    }
+}
+pub fn line_integral_s(f:&Function, c:&Contour, method:IntegrationMethod) -> f64 {
+    let (t0, t1) = c.bounds();
+    let ft:Box<dyn Fn(f64)->f64>;
+    match (f, c) {
+        (Function::TwoD(_), Contour::TwoD(_)) |
+        (Function::ThreeD(_), Contour::ThreeD(_)) |
+        (Function::ThreeD(_), Contour::TwoD(_)) => {
+            ft = Box::new(move |t:f64| {
+                f(c(t))*!ddt!(c, t)
+            });
+        },
+        _ => panic!("No line integral of a 2D function over a 3D contour")
+    }
+    match method {
+        IntegrationMethod::GaussLegendre => int_gauss_legendre!(ft, t0, t1),
+        IntegrationMethod::Riemann(n) => int_riemann!(ft, t0, t1, n),
+        IntegrationMethod::Simpson13(n) => int_simpson13!(ft, t0, t1, n)
+    }
+}
 */
