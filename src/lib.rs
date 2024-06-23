@@ -627,8 +627,8 @@ impl VectorFunction {
     }
     pub fn expression(&self) -> String {
         match self {
-            VectorFunction::TwoD(v) => v.clone().potential_expression.clone(),
-            VectorFunction::ThreeD(v) => v.clone().potential_expression.clone()
+            VectorFunction::TwoD(v) => v.potential_expression.clone(),
+            VectorFunction::ThreeD(v) => v.potential_expression.clone()
         }
     }
 }
@@ -1460,7 +1460,7 @@ pub fn rn_integral(f:&Function, lim:Vec<SuperSet>, n:i32) -> f64 {
     match (f, lim.len()) {
         (Function::TwoD(_), 2) => {
             match (&lim[0], &lim[1]) {
-                (SuperSet::Set(a), SuperSet::Set(b)) => {
+                (SuperSet::Set(a), SuperSet::Set(b)) => { // any
                     let mut sum = 0.0;
                     for _ in 0..n {
                         let x = rng.gen_range(a.i..a.f);
@@ -1469,35 +1469,142 @@ pub fn rn_integral(f:&Function, lim:Vec<SuperSet>, n:i32) -> f64 {
                     }
                     return (sum / n as f64) * (a.f - a.i) * (b.f - b.i);
                 }
-                (SuperSet::Set(a), SuperSet::FSet(b)) => {
+                (SuperSet::Set(a), SuperSet::FSet(b)) => { // dy dx
                     if let Function::OneD(_) = b.i {
                         let mut sum = 0.0;
+                        let mut var = 0.0;
                         for _ in 0..n {
                             let x = rng.gen_range(a.i..a.f);
-                            let y = rng.gen_range((b.i)(x)..(b.f)(x));
+                            let (yi, yf) = ((b.i)(x), (b.f)(x));
+                            let y = rng.gen_range(yi..yf);
                             sum += f(x, y);
+                            var += yf - yi;
                         }
-                        return sum / ((a.f - a.i) * n as f64);
+                        return (sum / n as f64)*(a.f - a.i)*(var / n as f64);
                     } else { panic!("Function limits for this double integral need to be 1D") }
                 },
-                (SuperSet::FSet(a), SuperSet::Set(b)) => {
+                (SuperSet::FSet(a), SuperSet::Set(b)) => { // dx dy
                     if let Function::OneD(_) = a.i {
                         let mut sum = 0.0;
+                        let mut var = 0.0;
                         for _ in 0..n {
                             let y = rng.gen_range(b.i..b.f);
-                            let x = rng.gen_range((a.i)(y)..(a.f)(y));
+                            let (xi, xf) = ((a.i)(y), (a.f)(y));
+                            let x = rng.gen_range(xi..xf);
                             sum += f(x, y);
+                            var += xf - xi;
                         }
-                        return sum / ((b.f - b.i) * n as f64);
+                        return (sum / (n as f64))*(b.f - b.i)*(var / n as f64);
                     } else { panic!("Function limits for this double integral need to be 1D") }
                 },
                 (_, _) => panic!("Both integral limits can't be functions")
             }
         },
-        (Function::ThreeD(f), 3) => {
-            f64::NAN
+        (Function::ThreeD(_), 3) => {
+            match (&lim[0], &lim[1], &lim[2]) {
+                (SuperSet::Set(a), SuperSet::Set(b), SuperSet::Set(c)) => { // any
+                    let mut sum = 0.0;
+                    for _ in 0..n {
+                        let x = rng.gen_range(a.i..a.f);
+                        let y = rng.gen_range(b.i..b.f);
+                        let z = rng.gen_range(c.i..c.f);
+                        sum += f(x, y, z);
+                    }
+                    return (sum / n as f64)*(a.f-a.i)*(b.f-b.i)*(c.f-c.i)
+                },
+                (_, _, _) => panic!("Triple integrals with variable bounds not supported yet"),
+                /*(SuperSet::Set(a), SuperSet::Set(b), SuperSet::FSet(c)) => { // dz dx dy | dz dy dx
+                    if let Function::TwoD(_) = c.i {
+                        let mut sum = 0.0;
+                        let mut var = 0.0;
+                        for _ in 0..n {
+                            let x = rng.gen_range(a.i..a.f);
+                            let y = rng.gen_range(b.i..b.f);
+                            let (zi, zf) = ((c.i)(x, y), (c.f)(x , y));
+                            let z = rng.gen_range(zi..zf);
+                            sum += f(x, y, z);
+                            var += zf - zi;
+                        }
+                        return (sum / n as f64)*(a.f-a.i)*(b.f-b.i)*(var / n as f64);
+                    } else if let Function::OneD(_) = c.i {
+                        panic!("Make the dy functions a 2D function and not use the other parameter to specify")
+                    } else { panic!("dy has to be a 2D function set")}
+                },
+                (SuperSet::Set(a), SuperSet::FSet(b), SuperSet::Set(c)) => { // dy dx dz | dy dz dx
+                    if let Function::TwoD(_) = b.i {
+                        let mut sum = 0.0;
+                        let mut var = 0.0;
+                        for _ in 0..n {
+                            let x = rng.gen_range(a.i..a.f);
+                            let z = rng.gen_range(c.i..c.f);
+                            let (yi, yf) = ((b.i)(x, z), (b.f)(x , z));
+                            let y = rng.gen_range(yi..yf);
+                            sum += f(x, y, z);
+                            var += yf - yi;
+                        }
+                        return (sum / n as f64)*(a.f-a.i)*(c.f-c.i)*(var / n as f64);
+                    } else if let Function::OneD(_) = b.i {
+                        panic!("Make the dz functions a 2D function and not use the other parameter to specify")
+                    } else { panic!("dz has to be a 2D function set")}
+                },
+                (SuperSet::FSet(a), SuperSet::Set(b), SuperSet::Set(c)) => { // dx dy dz | dx dz dy
+                    if let Function::TwoD(_) = a.i {
+                        let mut sum = 0.0;
+                        let mut var = 0.0;
+                        for _ in 0..n {
+                            let x = rng.gen_range(b.i..b.f);
+                            let z = rng.gen_range(c.i..c.f);
+                            let (xi, xf) = ((a.i)(x, z), (a.f)(x , z));
+                            let y = rng.gen_range(xi..xf);
+                            sum += f(x, y, z);
+                            var += xf - xi;
+                        }
+                        return (sum / n as f64)*(b.f-b.i)*(c.f-c.i)*(var / n as f64);
+                    } else if let Function::OneD(_) = a.i {
+                        panic!("Make the dx functions a 2D function and not use the other parameter to specify")
+                    } else { panic!("dx has to be a 2D function set")}
+                },
+                (SuperSet::Set(a), SuperSet::FSet(b), SuperSet::FSet(c)) => { // dz dx dy | dz dy dx
+                    if let Function::TwoD(_) = c.i {
+                        if let Function::OneD(_) = b.i { // Meaning z is inner and y is outer
+                            let mut sum = 0.0;
+                            let mut varb = 0.0;
+                            let mut varc = 0.0;
+                            for _ in 0..n {
+                                let x = rng.gen_range(a.i..a.f);
+                                let (yi, yf) = ((b.i)(x), (b.f)(x));
+                                let y = rng.gen_range(yi..yf);
+                                let (zi, zf) = ((c.i)(x,y), (c.f)(x,y));
+                                let z = rng.gen_range(zi..zf);
+                                sum += f(x,y,z);
+                                varb += yf - yi;
+                                varc += zf - zi;
+                            }
+                            return (sum / n as f64)*(a.f-a.i)*(varb / n as f64)*(varc / n as f64);
+                        } else if let Function::TwoD(_) = b.i { panic!("Both bound functions can't be 2D") } else {panic!("Fak1")}
+                    } else if let Function::OneD(_) = b.i {
+                        if let Function::TwoD(_) = c.i { // Meaning y is inner and z is outer
+                            let mut sum = 0.0;
+                            let mut varb = 0.0;
+                            let mut varc = 0.0;
+                            for _ in 0..n {
+                                let x = rng.gen_range(a.i..a.f);
+                                let (zi, zf) = ((c.i)(x), (c.f)(x));
+                                let z = rng.gen_range(zi..zf);
+                                let (yi, yf) = ((b.i)(x,z), (b.f)(x,z));
+                                let y = rng.gen_range(yi..yf);
+                                sum += f(x,y,z);
+                                varb += yf - yi;
+                                varc += zf - zi;
+                            }
+                            return (sum / n as f64)*(a.f-a.i)*(varb / n as f64)*(varc / n as f64);
+                        } else if let Function::OneD(_) = c.i { panic!("Use a 2D function and a 1D function, with the 2D being the inner function, even if you don't use one of the variables")}  else {panic!("Fak2")}
+                    } else {panic!("One function needs to be 2D and one 1D")}
+                },
+                (_, _, _) => panic!("All three integral limits can't be functions")*/
+            }
         },
-        (_, _) => panic!("Fak")
+        (_, _) => panic!("Need 3 bounds for 3D functions and 2 bounds for 2D functions")
     }
 }
 
@@ -1510,12 +1617,12 @@ pub struct ParametricSurface { // All supposed to be Function2D
     f3:Function,
     expression_f3:String
 }
-pub struct Surface {
+pub struct Surface<'s> {
     f:ParametricSurface,
-    u_lim:Set,
-    v_lim:Set
+    u_lim:SuperSet<'s>,
+    v_lim:SuperSet<'s>
 }
-impl Surface {
+impl<'s> Surface<'s> {
     pub fn ddu(&self, u:f64, v:f64) -> Vector {
         Vector::ThreeD(Vector3::new(((self.f.f1)(u + Δ, v) - (self.f.f1)(u, v))/Δ, ((self.f.f2)(u + Δ, v) - (self.f.f2)(u, v))/Δ, ((self.f.f3)(u + Δ, v) - (self.f.f3)(u, v))/Δ))
     }
@@ -1540,19 +1647,19 @@ impl Fn<(f64, f64)> for ParametricSurface {
         Vector::ThreeD(Vector3::new((self.f1)(args.0, args.1), (self.f2)(args.0, args.1), (self.f3)(args.0, args.1)))
     }
 }
-impl FnOnce<(f64, f64)> for Surface {
+impl<'s> FnOnce<(f64, f64)> for Surface<'s> {
     type Output = Vector;
 
     extern "rust-call" fn call_once(self, args: (f64, f64)) -> Self::Output {
         (self.f)(args.0, args.1)
     }
 }
-impl FnMut<(f64, f64)> for Surface {
+impl<'s> FnMut<(f64, f64)> for Surface<'s> {
     extern "rust-call" fn call_mut(&mut self, args: (f64, f64)) -> Self::Output {
         (self.f)(args.0, args.1)
     }
 }
-impl Fn<(f64, f64)> for Surface {
+impl<'s> Fn<(f64, f64)> for Surface<'s> {
     extern "rust-call" fn call(&self, args: (f64, f64)) -> Self::Output {
         (self.f)(args.0, args.1)
     }
@@ -1582,15 +1689,15 @@ macro_rules! surface {
                 f3: f!($u, $v, $f3),
                 expression_f3: String::from(stringify!($f3)),
             },
-            u_lim: set![$ui, $uf],
-            v_lim: set![$vi, $vf]
+            u_lim: set![$ui, $uf].wrap(),
+            v_lim: set![$vi, $vf].wrap()
         }
     };
     ($p:expr, $ul:expr, $vl:expr) => {
         Surface {
             f: $p,
-            u_lim: $ul,
-            v_lim: $vl
+            u_lim: $ul.wrap(),
+            v_lim: $vl.wrap()
         }
     }
 }
@@ -1675,12 +1782,12 @@ mod tests {
     }
     #[test]
     fn rn_integrals() {
-        let f = f!(x, y, x.powi(2)*y);
-        let a = set![0, 1];
-        let b = fset![f!(x, 0.), f!(x, x.powi(2))];
-        let c = fset![f!(y, y.sqrt()), f!(y, 1.)];
-        let d = set![0, 1];
-        println!("Integral = {}", rn_integral(&f, vec![a.wrap(), b.wrap()], 501));
+        println!("Int 2,2 = {}", rn_integral(&f!(x, y, (x.powi(4)+1.).sqrt()), vec![fset![f!(y, y.powf(1./3.)), f!(y, 2.)].wrap(), set![0, 8].wrap()], 1_000));
+
+        /*let g = f!(x, y, z, 1.);
+        println!("Int 3 = {}", rn_integral(&g, vec![fset![f!(y, z, 0.), f!(y, z, 1.-z)].wrap(), set![0, 2].wrap(), set![0, 1].wrap()], 2000));
+
+        println!("Int 3,2 = {}", rn_integral(&g, vec![set![0, 5].wrap(), fset![f!(x, 0.), f!(x, 5.-x)].wrap(), fset![f!(x, y, 0.), f!(x, y, 5.-x-y)].wrap()], 100_000));*/
     }
     #[test]
     fn surfaces() {
