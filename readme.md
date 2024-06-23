@@ -14,6 +14,7 @@ implemented for vectors
 scalar functions and vector functions, using Gauss-Legendre, Simpson 1/3 or Riemann.
 - v0.021 - Single variable scalar functions implemented, with derivatives and 
 the `integral!` macro
+- v0.022 - Added parametric surfaces
 # Usage
 To use the library, the project will have to be using the nightly toolchain,
 for which you can copy the "rust-toolchain.toml" file.\

@@ -1410,6 +1410,116 @@ pub fn integral_1d(f:&Function, set:&Set, method:IntegrationMethod) -> f64 {
     }
 }
 
+// ----- DOUBLE INTEGRAL -----
+
+
+// ----- SURFACES -----
+pub struct ParametricSurface { // All supposed to be Function2D
+    f1:Function,
+    expression_f1:String,
+    f2:Function,
+    expression_f2:String,
+    f3:Function,
+    expression_f3:String
+}
+pub struct Surface {
+    f:ParametricSurface,
+    u_lim:Set,
+    v_lim:Set
+}
+impl Surface {
+    pub fn ddu(&self, u:f64, v:f64) -> Vector {
+        Vector::ThreeD(Vector3::new(((self.f.f1)(u + Δ, v) - (self.f.f1)(u, v))/Δ, ((self.f.f2)(u + Δ, v) - (self.f.f2)(u, v))/Δ, ((self.f.f3)(u + Δ, v) - (self.f.f3)(u, v))/Δ))
+    }
+    pub fn ddv(&self, u:f64, v:f64) -> Vector {
+        Vector::ThreeD(Vector3::new(((self.f.f1)(u, v + Δ) - (self.f.f1)(u, v))/Δ, ((self.f.f2)(u, v + Δ) - (self.f.f2)(u, v))/Δ, ((self.f.f3)(u, v + Δ) - (self.f.f3)(u, v))/Δ))
+    }
+}
+impl FnOnce<(f64, f64)> for ParametricSurface {
+    type Output = Vector;
+
+    extern "rust-call" fn call_once(self, args: (f64, f64)) -> Self::Output {
+        Vector::ThreeD(Vector3::new((self.f1)(args.0, args.1), (self.f2)(args.0, args.1), (self.f3)(args.0, args.1)))
+    }
+}
+impl FnMut<(f64, f64)> for ParametricSurface {
+    extern "rust-call" fn call_mut(&mut self, args: (f64, f64)) -> Self::Output {
+        Vector::ThreeD(Vector3::new((self.f1)(args.0, args.1), (self.f2)(args.0, args.1), (self.f3)(args.0, args.1)))
+    }
+}
+impl Fn<(f64, f64)> for ParametricSurface {
+    extern "rust-call" fn call(&self, args: (f64, f64)) -> Self::Output {
+        Vector::ThreeD(Vector3::new((self.f1)(args.0, args.1), (self.f2)(args.0, args.1), (self.f3)(args.0, args.1)))
+    }
+}
+impl FnOnce<(f64, f64)> for Surface {
+    type Output = Vector;
+
+    extern "rust-call" fn call_once(self, args: (f64, f64)) -> Self::Output {
+        (self.f)(args.0, args.1)
+    }
+}
+impl FnMut<(f64, f64)> for Surface {
+    extern "rust-call" fn call_mut(&mut self, args: (f64, f64)) -> Self::Output {
+        (self.f)(args.0, args.1)
+    }
+}
+impl Fn<(f64, f64)> for Surface {
+    extern "rust-call" fn call(&self, args: (f64, f64)) -> Self::Output {
+        (self.f)(args.0, args.1)
+    }
+}
+#[macro_export]
+macro_rules! parametric_surface {
+    ($u:ident, $v:ident, $f1:expr, $f2:expr, $f3:expr) => {
+        ParametricSurface {
+                f1: f!($u, $v, $f1),
+                expression_f1: String::from(stringify!($f1)),
+                f2: f!($u, $v, $f2),
+                expression_f1: String::from(stringify!($f2)),
+                f1: f!($u, $v, $f3),
+                expression_f1: String::from(stringify!($f3)),
+            }
+    };
+}
+#[macro_export]
+macro_rules! surface {
+    ($u:ident, $v:ident, $f1:expr, $f2:expr, $f3:expr, $ui:expr, $uf:expr, $vi:expr, $vf:expr) => {
+        Surface {
+            f: ParametricSurface {
+                f1: f!($u, $v, $f1),
+                expression_f1: String::from(stringify!($f1)),
+                f2: f!($u, $v, $f2),
+                expression_f2: String::from(stringify!($f2)),
+                f3: f!($u, $v, $f3),
+                expression_f3: String::from(stringify!($f3)),
+            },
+            u_lim: set![$ui, $uf],
+            v_lim: set![$vi, $vf]
+        }
+    };
+    ($p:expr, $ul:expr, $vl:expr) => {
+        Surface {
+            f: $p,
+            u_lim: $ul,
+            v_lim: $vl
+        }
+    }
+}
+
+// ----- SURFACE INTEGRAL -----
+/*pub fn surface_integral(f:&Function, s:&Surface) -> f64 {
+    match f {
+        Function::ThreeD(_) => {
+            let ft = Box::new(|t:f64| {
+               !(s.ddu())
+            });
+        },
+        _ => panic!("No surface integrals for 1D and 2D functions")
+    }
+    f64::NAN
+}*/
+
 
 use std::f64::consts::{PI, E};
 #[cfg(test)]
@@ -1479,5 +1589,10 @@ mod tests {
         let f = f!(x, y, x.powi(2)*y);
         let c = contour!(t, t.cos(), t.sin(), 0, PI/2.);
         assert!(near!(line_integral!(f, c), 1./3.))
+    }
+    #[test]
+    fn surfaces() {
+        let s:Surface = surface!(u, v, u.sin()*v.cos(), u.sin()*v.sin(), u.cos(), 0, PI/2., 0, 2.*PI);
+        println!("s(PI, PI/2) = {}", s(PI, PI/2.));
     }
 }

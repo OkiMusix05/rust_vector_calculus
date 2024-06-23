@@ -195,3 +195,23 @@ If, however, the vector function comes from a gradient but it wasn’t obtained 
 $$
 \oint_\sigma\nabla f\cdot ds = 0
 $$
+
+## Surfaces
+
+Parametric surfaces are functions $S:\mathbb{R}^2\to\mathbb{R}^3$, and you can create one like this:
+
+```rust
+let s:ParametricSurface = parametric_surface!(u, v, u.sin()*v.cos(), u.sin()*v.sin(), u.cos());
+```
+
+However, parametric surfaces aren’t surfaces yet, because you have to limit its variables. If you already have a parametric surface you can create a surface with one and two sets like this:
+
+```rust
+let S:Surface = surface!(s, set![0, PI], set![0, 2.*PI]);
+```
+
+If not, you can use the same macro and create one from scratch:
+
+```rust
+let S:Surface = surface!(u, v, u.sin()*v.cos(), u.sin()*v.sin(), u.cos(), 0, PI/2., 0, 2.*PI);
+```
