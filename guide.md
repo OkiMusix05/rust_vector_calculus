@@ -41,7 +41,18 @@ let a:f64 = ddy!(g, 2, 3.5, PI);
 ```
 
 Note: These partial derivative macros return numbers, not functions.
+Adding to that, you can also call the `integral!` macro, which takes as arguments a scalar function and $n$ number of sets, that is, if $f$ is a function of $\mathbb{R}^2$ then the macro needs $2$ sets. In the case of one-dimensional functions, you can also optionally pass the preferred method of integrations (see line integrals for that), and in the case of two and three-dimensional functions you need to pass $m$ being the number of points to sample since the macro uses the Monte-Carlo method.
 
+The macro follows the structure: `integral!(function, x_bounds, y_bounds, z_bounds, method|n)`, for example
+
+```rust
+let _:f64 = integral!(f_1, set![0, PI], method::GaussLegendre); // one dimension
+let _:f64 = integral!(f_2, set![0, 1], fset![f!(x, 0.), f!(x, x*x)], 2_000); //two
+```
+
+As you can see, in double integrals you can also pass an `FSet`  to the integral, which means the bounds of the integral of the respective variable will not be constant. In triple integrals, though, you can only pass constant bounds as of the current version.
+
+### Gradient
 From scalar functions you can also create *vector functions*, although in these cases the string expressions are not updated to be the correct partial derivatives. There is a specific macro for this
 
 ```rust
@@ -130,6 +141,12 @@ where the two numbers indicate the continous one-dimensional space where a varia
 You can access the start and the end of this set through `t_space.i` and `t_space.f`.
 
 Sets also have a linspace method that you can call like `set.linspace(n)` where $n$ is the number of steps it takes when creating a `Vec` with its values in between.
+
+There are also `FSet`’s, which are sets that instead of scalars contain two functions, and these are usually used when integrating over non-constant bounds. You can create one like so:
+
+```rust
+let y_bounds:FSet = fset![f!(x, 0.), f!(x, x.powi(2))];
+```
 
 ### Contours
 

@@ -1432,17 +1432,6 @@ pub fn line_integral(g:_G, c:&Contour, method:IntegrationMethod) -> f64 {
         IntegrationMethod::Simpson13(n) => int_simpson13!(ft, t0, t1, n)
     }
 }
-macro_rules! integral {
-    ($f:expr, $s:expr) => {
-        integral_1d(&$f, &$s, IntegrationMethod::GaussLegendre)
-    };
-    ($f:expr, $a:expr, $b:expr) => {
-        integral_1d(&$f, &set![$a, $b], IntegrationMethod::GaussLegendre)
-    };
-    ($f:expr, $a:expr, $b:expr, $m:expr) => {
-        integral_1d(&$f, &set![$a, $b], $m)
-    };
-}
 pub fn integral_1d(f:&Function, set:&Set, method:IntegrationMethod) -> f64 {
     match f {
         Function::OneD(_) => match method {
@@ -1607,7 +1596,20 @@ pub fn rn_integral(f:&Function, lim:Vec<SuperSet>, n:i32) -> f64 {
         (_, _) => panic!("Need 3 bounds for 3D functions and 2 bounds for 2D functions")
     }
 }
-
+macro_rules! integral {
+    ($f:expr, $s:expr) => {
+        integral_1d(&$f, &$s, IntegrationMethod::GaussLegendre)
+    };
+    ($f:expr, $s:expr, $m:expr) => {
+        integral_1d(&$f, &$s, $m)
+    };
+    ($f:expr, $x:expr, $y:expr, $n:expr) => {
+        rn_integral(&$f, vec![$x.wrap(), $y.wrap()], $n)
+    };
+    ($f:expr, $x:expr, $y:expr, $z:expr, $n:expr) => {
+        rn_integral(&$f, vec![$x.wrap(), $y.wrap(), $z.wrap()], $n)
+    };
+}
 // ----- SURFACES -----
 pub struct ParametricSurface { // All supposed to be Function2D
     f1:Function,
@@ -1742,7 +1744,7 @@ mod tests {
         assert_eq!(g.expression(), String::from("x.powi(2) * y + z"));
 
         let h = f!(x, 1./x);
-        assert!(near!(integral!(h, 1., E), 1.));
+        assert!(near!(integral!(h, set![1., E]), 1.));
         assert!(near!(ddx!(h, 2.), -1./4.));
     }
     //noinspection ALL //This is for the squiggly lines when evaluating Vector Functions
@@ -1782,7 +1784,13 @@ mod tests {
     }
     #[test]
     fn rn_integrals() {
-        println!("Int 2,2 = {}", rn_integral(&f!(x, y, (x.powi(4)+1.).sqrt()), vec![fset![f!(y, y.powf(1./3.)), f!(y, 2.)].wrap(), set![0, 8].wrap()], 1_000));
+        let f = f!(x, y, (x.powi(4)+1.).sqrt());
+        let x_bounds = fset![f!(y, y.powf(1./3.)), f!(y, 2.)];
+        let y_bounds = set![0, 8];
+        let a:f64 = integral!(f, x_bounds, y_bounds, 1_000);
+        assert!(near!(a, (1./6.)*(17_f64.powf(1.5)-1.); 2.));
+
+        assert!(near!(integral!(f!(x, y, z, x*y + z), set![0, 2], set![0, 3], set![0, 1], 2000), 12.; 0.5));
 
         /*let g = f!(x, y, z, 1.);
         println!("Int 3 = {}", rn_integral(&g, vec![fset![f!(y, z, 0.), f!(y, z, 1.-z)].wrap(), set![0, 2].wrap(), set![0, 1].wrap()], 2000));

@@ -16,6 +16,8 @@ scalar functions and vector functions, using Gauss-Legendre, Simpson 1/3 or Riem
 the `integral!` macro
 - v0.022 - Added parametric surfaces
 - v0.023/v0.024 - Advancements on double integrals
+- v0.03 - Double integrals with non-constant bounds and triple integrals with 
+constant bounds
 # Usage
 To use the library, the project will have to be using the nightly toolchain,
 for which you can copy the "rust-toolchain.toml" file.\
