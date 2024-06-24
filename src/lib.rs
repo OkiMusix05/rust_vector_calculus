@@ -924,11 +924,10 @@ macro_rules! grad {
 }
 
 // ----- PARAMETRIC CURVES -----
-pub struct ParametricCurve2D {
-    pub f1:Box<dyn Fn(f64) -> f64>,
-    pub expression_f1:String,
-    pub f2:Box<dyn Fn(f64) -> f64>,
-    pub expression_f2:String,
+#[derive(Clone)]
+pub struct ParametricCurve2D { // Supposed to be 1D
+    pub f1:Function,
+    pub f2:Function,
 }
 impl ParametricCurve2D {
     pub fn ddt(&self, t:f64) -> Vector {
@@ -952,13 +951,11 @@ impl Fn<(f64,)> for ParametricCurve2D {
         Vector::TwoD(Vector2::new((self.f1)(args.0), (self.f2)(args.0)))
     }
 }
+#[derive(Clone)]
 pub struct ParametricCurve3D {
-    pub f1:Box<dyn Fn(f64) -> f64>,
-    pub expression_f1:String,
-    pub f2:Box<dyn Fn(f64) -> f64>,
-    pub expression_f2:String,
-    pub f3:Box<dyn Fn(f64) -> f64>,
-    pub expression_f3:String
+    pub f1:Function,
+    pub f2:Function,
+    pub f3:Function,
 }
 impl ParametricCurve3D {
     pub fn ddt(&self, t:f64) -> Vector {
@@ -982,6 +979,7 @@ impl Fn<(f64,)> for ParametricCurve3D {
         Vector::ThreeD(Vector3::new((self.f1)(args.0), (self.f2)(args.0), (self.f3)(args.0)))
     }
 }
+#[derive(Clone)]
 pub enum ParametricCurve {
     TwoD(ParametricCurve2D),
     ThreeD(ParametricCurve3D)
@@ -998,10 +996,10 @@ impl Display for ParametricCurve {
     fn fmt(&self, f: &mut Formatter<'_>) -> std::fmt::Result {
         match self {
             ParametricCurve::TwoD(sigma) => {
-                write!(f, "⟨{}, {}⟩", sigma.expression_f1, sigma.expression_f2)
+                write!(f, "⟨{}, {}⟩", sigma.f1.expression(), sigma.f2.expression())
             }
             ParametricCurve::ThreeD(sigma) => {
-                write!(f, "⟨{}, {}, {}⟩", sigma.expression_f1, sigma.expression_f2, sigma.expression_f3)
+                write!(f, "⟨{}, {}, {}⟩", sigma.f1.expression(), sigma.f2.expression(), sigma.f3.expression())
             }
         }
     }
@@ -1010,20 +1008,30 @@ impl Display for ParametricCurve {
 macro_rules! curve {
     ($t:ident, $f1:expr, $f2:expr) => {
         ParametricCurve::TwoD(ParametricCurve2D {
-            f1: Box::new(|$t:f64| $f1),
-            expression_f1: String::from(stringify!($f1)),
-            f2: Box::new(|$t:f64| $f2),
-            expression_f2: String::from(stringify!($f2)),
+            f1: Function::OneD(Function1D {
+                f: Box::new(|$t:f64| $f1),
+                expression: String::from(stringify!($f1))
+            }),
+            f2: Function::OneD(Function1D {
+                f: Box::new(|$t:f64| $f2),
+                expression: String::from(stringify!($f2))
+            })
         })
     };
     ($t:ident, $f1:expr, $f2:expr, $f3:expr) => {
         ParametricCurve::ThreeD(ParametricCurve3D {
-            f1: Box::new(|$t:f64| $f1),
-            expression_f1: String::from(stringify!($f1)),
-            f2: Box::new(|$t:f64| $f2),
-            expression_f2: String::from(stringify!($f2)),
-            f3: Box::new(|$t:f64| $f3),
-            expression_f3: String::from(stringify!($f3))
+            f1: Function::OneD(Function1D {
+                f: Box::new(|$t:f64| $f1),
+                expression: String::from(stringify!($f1))
+            }),
+            f2: Function::OneD(Function1D {
+                f: Box::new(|$t:f64| $f2),
+                expression: String::from(stringify!($f2))
+            }),
+            f3: Function::OneD(Function1D {
+                f: Box::new(|$t:f64| $f3),
+                expression: String::from(stringify!($f3))
+            })
         })
     };
 }
@@ -1130,14 +1138,17 @@ impl Display for FSet {
 }
 
 // ----- CONTOURS -----
+#[derive(Clone)]
 pub struct Contour2D {
     pub f_t: ParametricCurve2D,
     pub lim: Set
 }
+#[derive(Clone)]
 pub struct Contour3D {
     pub f_t: ParametricCurve3D,
     pub lim: Set
 }
+#[derive(Clone)]
 pub enum Contour {
     TwoD(Contour2D),
     ThreeD(Contour3D)
@@ -1161,15 +1172,34 @@ impl Contour {
             Contour::ThreeD(c) => c.lim.linspace(t)
         }
     }
+    pub fn len(&self) -> f64 {
+        let g = self.clone();
+        match self {
+            Contour::TwoD(c) => {
+                let f = Function::OneD(Function1D {
+                    f: Box::new(move |t:f64| !g.ddt(t)),
+                    expression: String::from(""),
+                });
+                integral_1d(&f, &c.lim, IntegrationMethod::GaussLegendre)
+            },
+            Contour::ThreeD(c) => {
+                let f = Function::OneD(Function1D {
+                    f: Box::new(move |t:f64| !g.ddt(t)),
+                    expression: String::from(""),
+                });
+                integral_1d(&f, &c.lim, IntegrationMethod::GaussLegendre)
+            }
+        }
+    }
 }
 impl Display for Contour {
     fn fmt(&self, f: &mut Formatter<'_>) -> std::fmt::Result {
         match self {
             Contour::TwoD(c) => {
-                write!(f, "⟨{}, {}⟩", c.f_t.expression_f1, c.f_t.expression_f2)
+                write!(f, "⟨{}, {}⟩", c.f_t.f1.expression(), c.f_t.f2.expression())
             }
             Contour::ThreeD(c) => {
-                write!(f, "⟨{}, {}, {}⟩", c.f_t.expression_f1, c.f_t.expression_f2, c.f_t.expression_f3)
+                write!(f, "⟨{}, {}, {}⟩", c.f_t.f1.expression(), c.f_t.f2.expression(), c.f_t.f3.expression())
             }
         }
     }
@@ -1179,10 +1209,14 @@ macro_rules! contour {
     ($t:ident, $f1:expr, $f2:expr, $t0:expr, $t1:expr) => {
         Contour::TwoD(Contour2D {
             f_t: ParametricCurve2D {
-                f1: Box::new(|$t:f64| { $f1 }),
-                expression_f1: String::from(stringify!($f1)),
-                f2: Box::new(|$t:f64| { $f2 }),
-                expression_f2: String::from(stringify!($f2))
+                f1: Function::OneD(Function1D {
+                    f: Box::new(|$t:f64| $f1),
+                    expression: String::from(stringify!($f1))
+                }),
+                f2: Function::OneD(Function1D {
+                    f: Box::new(|$t:f64| $f2),
+                    expression: String::from(stringify!($f2))
+                })
             },
             lim: set![$t0, $t1]
         })
@@ -1190,12 +1224,18 @@ macro_rules! contour {
     ($t:ident, $f1:expr, $f2:expr, $f3:expr, $t0:expr, $t1:expr) => {
         Contour::ThreeD(Contour3D {
             f_t: ParametricCurve3D {
-                f1: Box::new(|$t:f64| { $f1 }),
-                expression_f1: String::from(stringify!($f1)),
-                f2: Box::new(|$t:f64| { $f2 }),
-                expression_f2: String::from(stringify!($f2)),
-                f3: Box::new(|$t:f64| { $f3 }),
-                expression_f3: String::from(stringify!($f3))
+                f1: Function::OneD(Function1D {
+                    f: Box::new(|$t:f64| $f1),
+                    expression: String::from(stringify!($f1))
+                }),
+                f2: Function::OneD(Function1D {
+                    f: Box::new(|$t:f64| $f2),
+                    expression: String::from(stringify!($f2))
+                }),
+                f3: Function::OneD(Function1D {
+                    f: Box::new(|$t:f64| $f3),
+                    expression: String::from(stringify!($f3))
+                })
             },
             lim: set![$t0, $t1]
         })
@@ -1835,6 +1875,8 @@ mod tests {
         //println!("sigma = {}, space = {}", sigma, space);
 
         let c:Contour = contour!(t, t.cos(), t.sin(), 0, PI);
+        assert!(near!(c.len(), PI));
+
         println!("c(PI/2) = {}, dcdt(PI) = {}, where t is in {:?}", c(PI/2.), ddt!(c, PI), c.bounds());
 
         let s = contour!(sigma, space);

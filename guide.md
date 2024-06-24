@@ -177,6 +177,8 @@ Added to that, contours have a `c.bounds()` method that returns a tuple with two
 
 Note: Contours are also evaluated like regular rust functions (`c(PI/2.)`) and return Vectors like parametric curves.
 
+Note: Contours have a `c.len()` method which returns the length of the contour.
+
 ## Line Integrals
 
 $$
