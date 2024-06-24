@@ -34,6 +34,7 @@ let _:f64 = g(1., 2., 2.);
 ```
 
 When you create a scalar function, the expression is automatically saved as a string, which you can access as `f.expression()` , and functions can be cloned with `f.clone()`. To evaluate a function, run `f(1.,2.)`, for example, which means these evaluate like regular Rust functions — it’s worth noting that aside from that, you can also pass a `Vector` as argument to a scalar function and it will evaluate perfectly as long as the dimensions match.
+
 You can evaluate its partial derivatives too with the respective macro, like `ddx!`  for $\frac{\partial}{\partial x}$, and similarly for $y$, except for $z$ in an $\mathbb{R}^2$ function, which will panic.
 
 ```rust
@@ -41,6 +42,7 @@ let a:f64 = ddy!(g, 2, 3.5, PI);
 ```
 
 Note: These partial derivative macros return numbers, not functions.
+
 Adding to that, you can also call the `integral!` macro, which takes as arguments a scalar function and $n$ number of sets, that is, if $f$ is a function of $\mathbb{R}^2$ then the macro needs $2$ sets. In the case of one-dimensional functions, you can also optionally pass the preferred method of integrations (see line integrals for that), and in the case of two and three-dimensional functions you need to pass $m$ being the number of points to sample since the macro uses the Monte-Carlo method.
 
 The macro follows the structure: `integral!(function, x_bounds, y_bounds, z_bounds, method|n)`, for example
@@ -69,6 +71,7 @@ $$
 Note that creating a vector function like this does not take ownership of the original function.
 
 Note: Contrary to the partial derivative macros, the gradient macro does return a function.
+
 ### Limits
 
 When taking the limit of 2D or 3D scalar functions, the value is approximated by finding the average of the function at $f(x_0\pm\Delta,y_0\pm\Delta)$. For this, you can use the `limit!` macro as so
@@ -108,6 +111,7 @@ let c:f64 = !curl!(G, 1, PI, 2);
 ```
 
 Note that in the last line of the code shown, the `!` operator is used on the vector produced by the curl macro to obtain the magnitude (modulus) of the rotational of the vector function $G$ at the point $(1,\pi,2)$.
+
 ## Contours
 
 Contours consists of two parts: Parametric Curves and Sets.
@@ -224,11 +228,30 @@ let s:ParametricSurface = parametric_surface!(u, v, u.sin()*v.cos(), u.sin()*v.s
 However, parametric surfaces aren’t surfaces yet, because you have to limit its variables. If you already have a parametric surface you can create a surface with one and two sets like this:
 
 ```rust
-let S:Surface = surface!(s, set![0, PI], set![0, 2.*PI]);
+let S:Surface = surface!(s, set![0, PI], fset![f!(u,v, 0.), f!(u, v, u+v)]);
 ```
 
-If not, you can use the same macro and create one from scratch:
+If not, and all the bounds are constant, you can use the same macro and create one from scratch:
 
 ```rust
 let S:Surface = surface!(u, v, u.sin()*v.cos(), u.sin()*v.sin(), u.cos(), 0, PI/2., 0, 2.*PI);
 ```
+
+Finally, if you don’t have a parametric surface already and your bounds are not constant, you can use the macro as such:
+
+```rust
+let S:Surface = surface!(u, v, u+v, u*v, u.powf(v), fset![...], set![...]);
+```
+
+Surfaces have an `area` method, which calculates the area of a surface with the montecarlo method using 400 points. You can call it like `S.area()`.
+
+## Surface Integrals
+
+Surface integrals can integrate either scalar or vector functions. For this, there’s the `surface_integral!` macro, that you can use like this:
+
+```rust
+let _:f64 = surface_integral!(f, s); // f:Function 3D
+let _:f64 = surface_integral!(v, s, 100); //v:VectorFunction 3D
+```
+
+where `s` is a `Surface` . The default number of points for the integral is 200, and it uses the Monte Carlo method, although you can specify another $n$ yourself too.

@@ -592,24 +592,20 @@ macro_rules! limit {
 }
 
 // ----- VECTOR FUNCTIONS -----
+#[derive(Clone)]
 pub struct VectorFunction2D {
-    pub f1:Box<dyn Fn(f64, f64) -> f64>,
-    pub expression_f1:String,
-    pub f2:Box<dyn Fn(f64, f64) -> f64>,
-    pub expression_f2:String,
+    pub f1:Function,
+    pub f2:Function,
     pub potential: Option<Function>,
-    pub potential_expression: String
 }
+#[derive(Clone)]
 pub struct VectorFunction3D {
-    pub f1:Box<dyn Fn(f64, f64, f64) -> f64>,
-    pub expression_f1:String,
-    pub f2:Box<dyn Fn(f64, f64, f64) -> f64>,
-    pub expression_f2:String,
-    pub f3:Box<dyn Fn(f64, f64, f64) -> f64>,
-    pub expression_f3:String,
+    pub f1:Function,
+    pub f2:Function,
+    pub f3:Function,
     pub potential: Option<Function>,
-    pub potential_expression: String
 }
+#[derive(Clone)]
 pub enum VectorFunction {
     TwoD(VectorFunction2D),
     ThreeD(VectorFunction3D)
@@ -625,10 +621,14 @@ impl VectorFunction {
             } else {f64::NAN}
         }
     }
-    pub fn expression(&self) -> String {
+    pub fn potential_expression(&self) -> String {
         match self {
-            VectorFunction::TwoD(v) => v.potential_expression.clone(),
-            VectorFunction::ThreeD(v) => v.potential_expression.clone()
+            VectorFunction::TwoD(v) => if let Some(p) = v.potential.clone() {
+                p.expression()
+            } else {String::from("")},
+            VectorFunction::ThreeD(v) => if let Some(p) = v.potential.clone() {
+                p.expression()
+            } else {String::from("")}
         }
     }
 }
@@ -636,10 +636,10 @@ impl Display for VectorFunction {
     fn fmt(&self, f: &mut Formatter<'_>) -> std::fmt::Result {
         match self {
             VectorFunction::TwoD(v) => {
-                write!(f, "⟨{:.5}, {:.5}⟩", v.expression_f1, v.expression_f2)
+                write!(f, "⟨{:.5}, {:.5}⟩", v.f1.expression(), v.f2.expression())
             },
             VectorFunction::ThreeD(v) => {
-                write!(f, "⟨{:.5}, {:.5}, {:.5}⟩", v.expression_f1, v.expression_f2, v.expression_f3)
+                write!(f, "⟨{:.5}, {:.5}, {:.5}⟩", v.f1.expression(), v.f2.expression(), v.f3.expression())
             }
         }
     }
@@ -648,24 +648,32 @@ impl Display for VectorFunction {
 macro_rules! vector_function {
     ($x:ident, $y:ident, $f1:expr, $f2:expr) => {
         VectorFunction::TwoD(VectorFunction2D {
-            f1: Box::new(|$x:f64, $y:f64| $f1),
-            expression_f1: String::from(stringify!($f1)),
-            f2: Box::new(|$x:f64, $y:f64| $f2),
-            expression_f2: String::from(stringify!($f2)),
+            f1: Function::TwoD(Function2D {
+                f: Box::new(|$x:f64, $y:f64| $f1),
+                expression: String::from(stringify!($f1))
+            }),
+            f2: Function::TwoD(Function2D {
+                f: Box::new(|$x:f64, $y:f64| $f2),
+                expression: String::from(stringify!($f2))
+            }),
             potential: Option::None,
-            potential_expression: String::from("")
         })
     };
     ($x:ident, $y:ident, $z:ident, $f1:expr, $f2:expr, $f3:expr) => {
         VectorFunction::ThreeD(VectorFunction3D {
-            f1: Box::new(|$x:f64, $y:f64, $z:f64| $f1),
-            expression_f1: String::from(stringify!($f1)),
-            f2: Box::new(|$x:f64, $y:f64, $z:f64| $f2),
-            expression_f2: String::from(stringify!($f2)),
-            f3: Box::new(|$x:f64, $y:f64, $z:f64| $f3),
-            expression_f3: String::from(stringify!($f3)),
+            f1: Function::ThreeD(Function3D {
+                f: Box::new(|$x:f64, $y:f64, $z:f64| $f1),
+                expression: String::from(stringify!($f1))
+            }),
+            f2: Function::ThreeD(Function3D {
+                f: Box::new(|$x:f64, $y:f64, $z:f64| $f2),
+                expression: String::from(stringify!($f2))
+            }),
+            f3: Function::ThreeD(Function3D {
+                f: Box::new(|$x:f64, $y:f64, $z:f64| $f3),
+                expression: String::from(stringify!($f3))
+            }),
             potential: Option::None,
-            potential_expression: String::from("")
         })
     };
 }
@@ -875,11 +883,14 @@ pub fn grad(f:&Function) -> VectorFunction {
             let f1 = f.clone();
             let f2 = f.clone();
             VectorFunction::TwoD(VectorFunction2D {
-                expression_f1: format!("ddx({})", f.expression()),
-                expression_f2: format!("ddy({})", f.expression()),
-                potential_expression: f.expression(),
-                f1: Box::new(move |x:f64, y:f64| ddx_s(&f1, vec![x, y])),
-                f2: Box::new(move |x:f64, y:f64| ddy_s(&f2, vec![x, y])),
+                f1: Function::TwoD(Function2D {
+                    f: Box::new(move |x:f64, y:f64| ddy_s(&f1, vec![x, y])),
+                    expression: format!("ddx({})", f.expression())
+                }),
+                f2: Function::TwoD(Function2D {
+                    f: Box::new(move |x:f64, y:f64| ddy_s(&f2, vec![x, y])),
+                    expression: format!("ddy({})", f.expression())
+                }),
                 potential: Some(f.clone()),
             })
         }
@@ -888,14 +899,19 @@ pub fn grad(f:&Function) -> VectorFunction {
             let f2 = f.clone();
             let f3 = f.clone();
             VectorFunction::ThreeD(VectorFunction3D {
-                expression_f1: format!("ddx({})", f.expression()),
-                expression_f2: format!("ddy({})", f.expression()),
-                expression_f3: format!("ddz({})", f.expression()),
-                potential_expression: f.expression(),
-                f1: Box::new(move |x:f64, y:f64, z:f64| ddx_s(&f1, vec![x, y, z])),
-                f2: Box::new(move |x:f64, y:f64, z:f64| ddy_s(&f2, vec![x, y, z])),
-                f3: Box::new(move |x:f64, y:f64, z:f64| ddz_s(&f3, vec![x, y, z])),
-                potential: Some(f.clone()),
+                f1: Function::ThreeD(Function3D {
+                    f: Box::new(move |x:f64, y:f64, z:f64| ddx_s(&f1, vec![x, y, z])),
+                    expression: format!("ddx({})", f.expression())
+                }),
+                f2: Function::ThreeD(Function3D {
+                    f: Box::new(move |x:f64, y:f64, z:f64| ddy_s(&f2, vec![x, y, z])),
+                    expression: format!("ddy({})", f.expression())
+                }),
+                f3: Function::ThreeD(Function3D {
+                    f: Box::new(move |x:f64, y:f64, z:f64| ddz_s(&f3, vec![x, y, z])),
+                    expression: format!("ddz({})", f.expression())
+                }),
+                potential: Some(f.clone())
             })
         }
     }
@@ -1611,8 +1627,8 @@ macro_rules! integral {
         rn_integral(&$f, vec![$x.wrap(), $y.wrap(), $z.wrap()], $n)
     };
 }
-// ----- SURFACES -----
 
+// ----- SURFACES -----
 #[derive(Clone)]
 pub struct ParametricSurface { // All supposed to be Function2D
     f1:Function,
@@ -1643,6 +1659,9 @@ impl<'s> Surface<'s> {
     }
     pub fn ddv(&self, u:f64, v:f64) -> Vector {
         self.f.ddv(u, v)
+    }
+    pub fn area(&self) -> f64 {
+        surface_integral(&f!(x, y, z, 1.).wrap(), &self, 400)
     }
 }
 impl FnOnce<(f64, f64)> for ParametricSurface {
@@ -1708,6 +1727,20 @@ macro_rules! surface {
             v_lim: set![$vi, $vf].wrap()
         }
     };
+    ($u:ident, $v:ident, $f1:expr, $f2:expr, $f3:expr, $ul:expr, $vl:expr) => {
+        Surface {
+            f: ParametricSurface {
+                f1: f!($u, $v, $f1),
+                expression_f1: String::from(stringify!($f1)),
+                f2: f!($u, $v, $f2),
+                expression_f2: String::from(stringify!($f2)),
+                f3: f!($u, $v, $f3),
+                expression_f3: String::from(stringify!($f3)),
+            },
+            u_lim: $ul.wrap(),
+            v_lim: $vl.wrap()
+        }
+    };
     ($p:expr, $ul:expr, $vl:expr) => {
         Surface {
             f: $p,
@@ -1718,43 +1751,40 @@ macro_rules! surface {
 }
 
 // ----- SURFACE INTEGRAL -----
-pub fn surface_integral(g:&_G, s:&Surface) -> f64 {
+pub fn surface_integral(g:&_G, s:&Surface, n:i32) -> f64 {
+    let s_clone = s.clone();
+    let (u, v): (SuperSet, SuperSet) = (s_clone.u_lim, s_clone.v_lim);
+    let s = s_clone.f;
     match g {
         _G::Function(f) => {
             if let Function::ThreeD(_) = f {
-                let s_clone = s.clone();
-                let (u, v) = (s_clone.u_lim, s_clone.v_lim);
-                let s = s_clone.f;
                 let fuv = Function::TwoD(Function2D {
                     f: Box::new(move |u:f64, v:f64| {
                         !(s.ddu(u, v)%s.ddv(u, v))
                     }),
-                    expression: String::from(""),
+                    expression: String::from("")
                 });
-                rn_integral(&fuv, vec![u, v], 2_000)
+                rn_integral(&fuv, vec![u, v], n)
             } else { panic!("No surface integrals for 1D and 2D functions") }
         }
         _G::VectorFunction(f) => {
-            f64::NAN
+            let f = f.clone().clone();
+            if let VectorFunction::ThreeD(_) = f {
+                let vuv = Function::TwoD(Function2D {
+                    f: Box::new(move |u:f64, v:f64| {
+                        f(s(u, v))*(s.ddu(u, v)%s.ddv(u,v))
+                    }),
+                    expression: String::from("")
+                });
+                rn_integral(&vuv, vec![u, v], n)
+            } else { panic!("No surface integrals for 1D and 2D vector functions") }
         }
     }
 }
-/*pub fn surface_integral(f:&Function, s:Surface) -> f64 {
-    match f {
-        Function::ThreeD(_) => {
-            let s = s.clone();
-            let fuv = Function::TwoD(Function2D {
-                f: Box::new(|u: f64, v: f64| {
-                    !(s.ddu(u, v)%s.ddv(u, v))
-                }),
-                expression: "".to_string(),
-            });
-            rn_integral(&fuv, vec![s.u_lim, s.v_lim], 2_000)
-        },
-        _ => panic!("No surface integrals for 1D and 2D functions")
-    }
-}*/
-
+macro_rules! surface_integral {
+    ($f:expr, $s:expr) => { surface_integral(&$f.wrap(), &$s, 250) };
+    ($f:expr, $s:expr, $n:expr) => { surface_integral(&$f.wrap(), &$s, $n) };
+}
 
 use std::f64::consts::{PI, E};
 #[cfg(test)]
@@ -1837,10 +1867,13 @@ mod tests {
     }
     #[test]
     fn surfaces() {
+        let v = vector_function!(x, y, z, x, y, z);
         let s:Surface = surface!(u, v, u.sin()*v.cos(), u.sin()*v.sin(), u.cos(), 0, PI/2., 0, 2.*PI);
+        let rho = surface!(u, v, u+v, u*v, u.powf(v), set![0, 2.*PI], set![0, 10]);
         assert!(near_v!(s(PI, PI/2.), vector!(0, 0, -1)));
 
-        let a:f64 = surface_integral(&f!(x, y, z, 1.).wrap(), &s);
-        println!("a = {}", a);
+        let b:f64 = surface_integral!(v, s, 100);
+        println!("a = {}", s.area());
+        println!("b = {}", b);
     }
 }

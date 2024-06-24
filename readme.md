@@ -19,6 +19,8 @@ the `integral!` macro
 - v0.03 - Double integrals with non-constant bounds and triple integrals with 
 constant bounds
 - v0.035 - Surface integrals for scalar functions skeleton working, no macro yet
+- v0.04 - Surface integrals for scalar and vector functions, reworking of vector
+functions and a macro. Area method for surfaces
 # Usage
 To use the library, the project will have to be using the nightly toolchain,
 for which you can copy the "rust-toolchain.toml" file.\
