@@ -18,6 +18,7 @@ the `integral!` macro
 - v0.023/v0.024 - Advancements on double integrals
 - v0.03 - Double integrals with non-constant bounds and triple integrals with 
 constant bounds
+- v0.035 - Surface integrals for scalar functions skeleton working, no macro yet
 # Usage
 To use the library, the project will have to be using the nightly toolchain,
 for which you can copy the "rust-toolchain.toml" file.\

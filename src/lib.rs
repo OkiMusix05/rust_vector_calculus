@@ -1087,6 +1087,7 @@ impl FSet {
         }
     }
 }
+#[derive(Clone)]
 enum SuperSet<'s> {
     Set(&'s Set),
     FSet(&'s FSet)
@@ -1611,6 +1612,8 @@ macro_rules! integral {
     };
 }
 // ----- SURFACES -----
+
+#[derive(Clone)]
 pub struct ParametricSurface { // All supposed to be Function2D
     f1:Function,
     expression_f1:String,
@@ -1619,17 +1622,27 @@ pub struct ParametricSurface { // All supposed to be Function2D
     f3:Function,
     expression_f3:String
 }
+
+#[derive(Clone)]
 pub struct Surface<'s> {
     f:ParametricSurface,
     u_lim:SuperSet<'s>,
     v_lim:SuperSet<'s>
 }
-impl<'s> Surface<'s> {
+impl ParametricSurface {
     pub fn ddu(&self, u:f64, v:f64) -> Vector {
-        Vector::ThreeD(Vector3::new(((self.f.f1)(u + Δ, v) - (self.f.f1)(u, v))/Δ, ((self.f.f2)(u + Δ, v) - (self.f.f2)(u, v))/Δ, ((self.f.f3)(u + Δ, v) - (self.f.f3)(u, v))/Δ))
+        Vector::ThreeD(Vector3::new(((self.f1)(u + Δ, v) - (self.f1)(u, v))/Δ, ((self.f2)(u + Δ, v) - (self.f2)(u, v))/Δ, ((self.f3)(u + Δ, v) - (self.f3)(u, v))/Δ))
     }
     pub fn ddv(&self, u:f64, v:f64) -> Vector {
-        Vector::ThreeD(Vector3::new(((self.f.f1)(u, v + Δ) - (self.f.f1)(u, v))/Δ, ((self.f.f2)(u, v + Δ) - (self.f.f2)(u, v))/Δ, ((self.f.f3)(u, v + Δ) - (self.f.f3)(u, v))/Δ))
+        Vector::ThreeD(Vector3::new(((self.f1)(u, v + Δ) - (self.f1)(u, v))/Δ, ((self.f2)(u, v + Δ) - (self.f2)(u, v))/Δ, ((self.f3)(u, v + Δ) - (self.f3)(u, v))/Δ))
+    }
+}
+impl<'s> Surface<'s> {
+    pub fn ddu(&self, u:f64, v:f64) -> Vector {
+        self.f.ddu(u, v)
+    }
+    pub fn ddv(&self, u:f64, v:f64) -> Vector {
+        self.f.ddv(u, v)
     }
 }
 impl FnOnce<(f64, f64)> for ParametricSurface {
@@ -1705,16 +1718,41 @@ macro_rules! surface {
 }
 
 // ----- SURFACE INTEGRAL -----
-/*pub fn surface_integral(f:&Function, s:&Surface) -> f64 {
+pub fn surface_integral(g:&_G, s:&Surface) -> f64 {
+    match g {
+        _G::Function(f) => {
+            if let Function::ThreeD(_) = f {
+                let s_clone = s.clone();
+                let (u, v) = (s_clone.u_lim, s_clone.v_lim);
+                let s = s_clone.f;
+                let fuv = Function::TwoD(Function2D {
+                    f: Box::new(move |u:f64, v:f64| {
+                        !(s.ddu(u, v)%s.ddv(u, v))
+                    }),
+                    expression: String::from(""),
+                });
+                rn_integral(&fuv, vec![u, v], 2_000)
+            } else { panic!("No surface integrals for 1D and 2D functions") }
+        }
+        _G::VectorFunction(f) => {
+            f64::NAN
+        }
+    }
+}
+/*pub fn surface_integral(f:&Function, s:Surface) -> f64 {
     match f {
         Function::ThreeD(_) => {
-            let ft = Box::new(|t:f64| {
-               !(s.ddu())
+            let s = s.clone();
+            let fuv = Function::TwoD(Function2D {
+                f: Box::new(|u: f64, v: f64| {
+                    !(s.ddu(u, v)%s.ddv(u, v))
+                }),
+                expression: "".to_string(),
             });
+            rn_integral(&fuv, vec![s.u_lim, s.v_lim], 2_000)
         },
         _ => panic!("No surface integrals for 1D and 2D functions")
     }
-    f64::NAN
 }*/
 
 
@@ -1801,5 +1839,8 @@ mod tests {
     fn surfaces() {
         let s:Surface = surface!(u, v, u.sin()*v.cos(), u.sin()*v.sin(), u.cos(), 0, PI/2., 0, 2.*PI);
         assert!(near_v!(s(PI, PI/2.), vector!(0, 0, -1)));
+
+        let a:f64 = surface_integral(&f!(x, y, z, 1.).wrap(), &s);
+        println!("a = {}", a);
     }
 }
