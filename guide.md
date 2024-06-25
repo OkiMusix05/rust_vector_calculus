@@ -1,8 +1,6 @@
-# Guide
-This document is designed to teach all the functions on the crate.
 ## Vectors
 
-Vectors here represent a vector in either $\mathbb{R}^2$ or $\mathbb{R}^3$, depending which object you are using. Vectors can be obtained as the result from a vector function, a parametric curve, an operation, etc.
+Vectors here represent a vector in either $\R^2$ or $\R^3$, depending which object you are using. Vectors can be obtained as the result from a vector function, a parametric curve, an operation, etc.
 
 To create a vector, you can use the `vector!` macro. The type of vector that comes from this depends on if you input 2 or 3 numbers. However, the type for both of this is `Vector`.
 
@@ -15,7 +13,7 @@ If you want to access the $x$ and $y$ coordinates, you can do it as `v.x()` or `
 
 There’s also operations you can do, for example the dot product between two vectors, expressed as `u*v` .
 
-Along side scalar product, there’s also the cross product written as `u%v` , which always returns a Vector in $\mathbb{R}^3$.
+Along side scalar product, there’s also the cross product written as `u%v` , which always returns a Vector in $\R^3$.
 
 To take the modulus of a vector, there are 3 ways:
 
@@ -25,7 +23,7 @@ To take the modulus of a vector, there are 3 ways:
 
 ## Scalar Functions
 
-You can also create scalar functions $f(x)$, $f(x,y)$ or $f(x,y,z)$. For this, use the `f!` macro, which depending on the arguments you pass, the type of the function: $\mathbb{R}$, $\mathbb{R}^2$ or $\mathbb{R}^3$.
+You can also create scalar functions $f(x,y)$ or $f(x,y,z)$. For this, use the `f!` macro, which depending on the arguments you pass, the type of the function: $\R^2$ or $\R^3$.
 
 ```rust
 let f:Function = f!(x, y, x*y);
@@ -33,9 +31,11 @@ let g:Function = f!(x, y, z, x.powi(2)*y + z);
 let _:f64 = g(1., 2., 2.);
 ```
 
-When you create a scalar function, the expression is automatically saved as a string, which you can access as `f.expression()` , and functions can be cloned with `f.clone()`. To evaluate a function, run `f(1.,2.)`, for example, which means these evaluate like regular Rust functions — it’s worth noting that aside from that, you can also pass a `Vector` as argument to a scalar function and it will evaluate perfectly as long as the dimensions match.
+When you create a scalar function, the expression is automatically saved as a string, which you can access as `f.expression()` , and functions can be cloned with `f.clone()`. To evaluate a function, run `f(1.,2.)`, for example, which means these evaluate like regular Rust functions — it’s worth noting that aside from that, you can also pass a Vector as argument to a scalar function and it will evaluate perfectly as long as the dimensions match.
 
-You can evaluate its partial derivatives too with the respective macro, like `ddx!`  for $\frac{\partial}{\partial x}$, and similarly for $y$, except for $z$ in an $\mathbb{R}^2$ function, which will panic.
+### Derivatives
+
+You can evaluate a function’s partial derivatives too with the respective macro, like `ddx!`  for $\frac{\partial}{\partial x}$, and similarly for $y$, except for $\frac{\partial}{\partial z}$ in an $\R^2$ function, which will panic.
 
 ```rust
 let a:f64 = ddy!(g, 2, 3.5, PI);
@@ -43,18 +43,34 @@ let a:f64 = ddy!(g, 2, 3.5, PI);
 
 Note: These partial derivative macros return numbers, not functions.
 
-Adding to that, you can also call the `integral!` macro, which takes as arguments a scalar function and $n$ number of sets, that is, if $f$ is a function of $\mathbb{R}^2$ then the macro needs $2$ sets. In the case of one-dimensional functions, you can also optionally pass the preferred method of integrations (see line integrals for that), and in the case of two and three-dimensional functions you need to pass $m$ being the number of points to sample since the macro uses the Monte-Carlo method.
+### Integrals
 
-The macro follows the structure: `integral!(function, x_bounds, y_bounds, z_bounds, method|n)`, for example
+For integrating functions, there’s the `integral!` macro, which can be called in many ways depending on the context, but all are equally valid. Here’s the general structure
 
 ```rust
-let _:f64 = integral!(f_1, set![0, PI], method::GaussLegendre); // one dimension
-let _:f64 = integral!(f_2, set![0, 1], fset![f!(x, 0.), f!(x, x*x)], 2_000); //two
+integral!(f1:Function, bounds:Sets); // 1D function
+integral!(f1:Function, a:f64, b:f64); // 1D function
+integral!(f1:Function, bounds:Sets, method:IntegrationMethod); // 1D function
+integral!(f2:Function, x_bounds:Sets, y_bounds:Sets) // 2D function
+integral!(f2:Function, x_bounds:Sets, y_bounds:Sets, method:MultipleIntegrationMethod) // 2D function
+integral!(f3:Function, x_bounds:Sets, y_bounds:Sets, z_bounds:Sets); // 3D function
+integral!(f3:Function, x_bounds:Sets, y_bounds:Sets, z_bounds:Sets, method:MultipleIntegrationMethod); // 3D function
 ```
 
-As you can see, in double integrals you can also pass an `FSet`  to the integral, which means the bounds of the integral of the respective variable will not be constant. In triple integrals, though, you can only pass constant bounds as of the current version.
+where `Sets` means it can be either a `Set` or an `FSet` , and where `IntegrationMethod` and `MultipleIntegrationMethod` are enums. For single variable integration methods you can look up the chart on Line Integrals, and for multiple there are the following methods:
+
+| Method | Description |
+| --- | --- |
+| Monte Carlo | Random method, default is 400 points |
+| Mid Point | Classic method, requires a $\delta$, recommended is 0.05 |
+| Simpson | Better than Mid Point, also requires a $\delta$ |
+
+Note: Integration for 3D functions with non-constant limits is not yet implemented.
+
+Note: The `setup!()` macro was added to import these enum variants so you don’t have to write `IntegrationMethod::MonteCarlo(n)` every time, for example, and can just write `MonteCarlo(m)`.
 
 ### Gradient
+
 From scalar functions you can also create *vector functions*, although in these cases the string expressions are not updated to be the correct partial derivatives. There is a specific macro for this
 
 ```rust
@@ -89,7 +105,7 @@ $$
 F(x,y)=\langle f_1(x,y),f_2(x,y)\rangle
 $$
 
-Vector Functions can be either in $\mathbb{R}^2$ or $\mathbb{R}^3$; they take in a $n$ number of arguments and return a vector.
+Vector Functions can be either in $\R^2$ or $\R^3$; they take in a $n$ number of arguments and return a vector.
 
 You can create a Vector Function using the `vector_function!` macro like this:
 
@@ -102,10 +118,10 @@ where the first parameters are the variables to use, and the last ones are the e
 
 These functions also encode their component scalar functions as strings, and you can access them as `F.expression_f1` and similarily for $f_2$ and $f_3$; they also evaluate like regular Rust functions, as well as evaluating on Vectors, like `F(v)`  if `v:Vector`.
 
-Vector Functions also have methods to take their partial derivatives, although they’re named slightly differently, as the macros `dvdy!` where you can see the *v* added to indicate it is the partial derivative of a vector function. The more important methods, however, are *curl* and *div*, which also have their respective macros representing the operations $\nabla\times F$ and $\nabla\cdot F$.
+Vector Functions also have methods to take their partial derivatives, although they’re named slightly differently, as the macros `ddxv!` where you can see the *v* added to indicate it is the partial derivative of a vector function. The more important methods, however, are *curl* and *div*, which also have their respective macros representing the operations $\nabla\times F$ and $\nabla\cdot F$.
 
 ```rust
-let b:f64 = dvdy!(F, 1, 2);
+let b:f64 = ddyv!(F, 1, 2);
 let _:Vector = curl!(F, 0, PI);
 let c:f64 = !curl!(G, 1, PI, 2);
 ```
@@ -118,7 +134,7 @@ Contours consists of two parts: Parametric Curves and Sets.
 
 ### Parametric Curves
 
-Parametric curves are a function that goes from $\mathbb{R}\to\mathbb{R}^n$, where here $n=2,3$. You can create a parametric curve using the`curve!` macro:
+Parametric curves are a function that goes from $\R\to\R^n$, where here $n=2,3$. You can create a parametric curve using the`curve!` macro:
 
 ```rust
 let curve:ParametricCurve = curve!(t, t.cos(), t.sin()); 
