@@ -1,4 +1,5 @@
 ## Vectors
+
 Vectors here represent a vector in either $\mathbb{R}^2$ or $\mathbb{R}^3$, depending which object you are using. Vectors can be obtained as the result from a vector function, a parametric curve, an operation, etc.
 
 To create a vector, you can use the `vector!` macro. The type of vector that comes from this depends on if you input 2 or 3 numbers. However, the type for both of this is `Vector`.
