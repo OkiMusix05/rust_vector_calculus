@@ -817,17 +817,17 @@ pub fn ddz_v(v:&VectorFunction, args:Vec<f64>) -> Vector {
     }
 }
 #[macro_export]
-macro_rules! dvdx {
+macro_rules! ddxv {
     ($f:expr, $x:expr, $y:expr) => {ddx_v(&$f, vec![$x as f64, $y as f64])};
     ($f:expr, $x:expr, $y:expr, $z:expr) => {ddx_v(&$f, vec![$x as f64, $y as f64, $z as f64])};
 }
 #[macro_export]
-macro_rules! dvdy {
+macro_rules! ddyv {
     ($f:expr, $x:expr, $y:expr) => {ddy_v(&$f, vec![$x as f64, $y as f64])};
     ($f:expr, $x:expr, $y:expr, $z:expr) => {ddy_v(&$f, vec![$x as f64, $y as f64, $z as f64])};
 }
 #[macro_export]
-macro_rules! dvdz {
+macro_rules! ddzv {
     ($f:expr, $x:expr, $y:expr, $z:expr) => {ddz_v(&$f, vec![$x as f64, $y as f64, $z as f64])};
 }
 // Curl
@@ -1334,6 +1334,8 @@ macro_rules! near_v {
         }
     };
 }
+// Single Integration
+#[derive(Clone)]
 pub enum IntegrationMethod {
     GaussLegendre,
     Riemann(i32),
@@ -1377,6 +1379,269 @@ macro_rules! int_simpson13 {
             }
             1./3. * δ * ($ft($t0) + $ft($t1) + sum)
     }};
+}
+// Multiple integration
+#[derive(Clone)]
+pub enum MultipleIntegrationMethod {
+    MonteCarlo(i32),
+    MidPoint(f64),
+    Simpson(f64)
+}
+fn int_monte_carlo_2d(f:&Function, a:&SuperSet, b:&SuperSet, n:i32) -> f64 {
+    if let Function::TwoD(_) = f {
+        let mut rng = rand::thread_rng();
+        match (a, b) {
+            (SuperSet::Set(a), SuperSet::Set(b)) => {
+                let mut sum = 0.0;
+                for _ in 0..n {
+                    let x = rng.gen_range(a.i..a.f);
+                    let y = rng.gen_range(b.i..b.f);
+                    sum += f(x, y);
+                }
+                return (sum / n as f64) * (a.f - a.i) * (b.f - b.i);
+            },
+            (SuperSet::Set(a), SuperSet::FSet(b)) => {
+                if let Function::OneD(_) = b.i {
+                    let mut sum = 0.0;
+                    let mut var = 0.0;
+                    for _ in 0..n {
+                        let x = rng.gen_range(a.i..a.f);
+                        let (yi, yf) = ((b.i)(x), (b.f)(x));
+                        let y = rng.gen_range(yi..yf);
+                        sum += f(x, y);
+                        var += yf - yi;
+                    }
+                    return (sum / n as f64)*(a.f - a.i)*(var / n as f64);
+                } else { panic!("Function limits for this double integral need to be 1D") }
+            },
+            (SuperSet::FSet(a), SuperSet::Set(b)) => {
+                if let Function::OneD(_) = a.i {
+                    let mut sum = 0.0;
+                    let mut var = 0.0;
+                    for _ in 0..n {
+                        let y = rng.gen_range(b.i..b.f);
+                        let (xi, xf) = ((a.i)(y), (a.f)(y));
+                        let x = rng.gen_range(xi..xf);
+                        sum += f(x, y);
+                        var += xf - xi;
+                    }
+                    return (sum / (n as f64))*(b.f - b.i)*(var / n as f64);
+                } else { panic!("Function limits for this double integral need to be 1D") }
+            },
+            (_, _) => panic!("Both bounds can't be functions")
+        }
+    } else { panic!("2D Functions require 2 bounds") }
+}
+fn int_monte_carlo_3d(f:&Function, a:&SuperSet, b:&SuperSet, c:&SuperSet, n:i32) -> f64 {
+    if let Function::ThreeD(_) = f {
+        let mut rng = rand::thread_rng();
+        match (a, b, c) {
+            (SuperSet::Set(a), SuperSet::Set(b), SuperSet::Set(c)) => { // any
+                let mut sum = 0.0;
+                for _ in 0..n {
+                    let x = rng.gen_range(a.i..a.f);
+                    let y = rng.gen_range(b.i..b.f);
+                    let z = rng.gen_range(c.i..c.f);
+                    sum += f(x, y, z);
+                }
+                return (sum / n as f64)*(a.f-a.i)*(b.f-b.i)*(c.f-c.i)
+            },
+            (_, _, _) => panic!("Triple integrals with variable bounds not supported yet"),
+            /*(SuperSet::Set(a), SuperSet::Set(b), SuperSet::FSet(c)) => { // dz dx dy | dz dy dx
+                    if let Function::TwoD(_) = c.i {
+                        let mut sum = 0.0;
+                        let mut var = 0.0;
+                        for _ in 0..n {
+                            let x = rng.gen_range(a.i..a.f);
+                            let y = rng.gen_range(b.i..b.f);
+                            let (zi, zf) = ((c.i)(x, y), (c.f)(x , y));
+                            let z = rng.gen_range(zi..zf);
+                            sum += f(x, y, z);
+                            var += zf - zi;
+                        }
+                        return (sum / n as f64)*(a.f-a.i)*(b.f-b.i)*(var / n as f64);
+                    } else if let Function::OneD(_) = c.i {
+                        panic!("Make the dy functions a 2D function and not use the other parameter to specify")
+                    } else { panic!("dy has to be a 2D function set")}
+                },
+                (SuperSet::Set(a), SuperSet::FSet(b), SuperSet::Set(c)) => { // dy dx dz | dy dz dx
+                    if let Function::TwoD(_) = b.i {
+                        let mut sum = 0.0;
+                        let mut var = 0.0;
+                        for _ in 0..n {
+                            let x = rng.gen_range(a.i..a.f);
+                            let z = rng.gen_range(c.i..c.f);
+                            let (yi, yf) = ((b.i)(x, z), (b.f)(x , z));
+                            let y = rng.gen_range(yi..yf);
+                            sum += f(x, y, z);
+                            var += yf - yi;
+                        }
+                        return (sum / n as f64)*(a.f-a.i)*(c.f-c.i)*(var / n as f64);
+                    } else if let Function::OneD(_) = b.i {
+                        panic!("Make the dz functions a 2D function and not use the other parameter to specify")
+                    } else { panic!("dz has to be a 2D function set")}
+                },
+                (SuperSet::FSet(a), SuperSet::Set(b), SuperSet::Set(c)) => { // dx dy dz | dx dz dy
+                    if let Function::TwoD(_) = a.i {
+                        let mut sum = 0.0;
+                        let mut var = 0.0;
+                        for _ in 0..n {
+                            let x = rng.gen_range(b.i..b.f);
+                            let z = rng.gen_range(c.i..c.f);
+                            let (xi, xf) = ((a.i)(x, z), (a.f)(x , z));
+                            let y = rng.gen_range(xi..xf);
+                            sum += f(x, y, z);
+                            var += xf - xi;
+                        }
+                        return (sum / n as f64)*(b.f-b.i)*(c.f-c.i)*(var / n as f64);
+                    } else if let Function::OneD(_) = a.i {
+                        panic!("Make the dx functions a 2D function and not use the other parameter to specify")
+                    } else { panic!("dx has to be a 2D function set")}
+                },
+                (SuperSet::Set(a), SuperSet::FSet(b), SuperSet::FSet(c)) => { // dz dx dy | dz dy dx
+                    if let Function::TwoD(_) = c.i {
+                        if let Function::OneD(_) = b.i { // Meaning z is inner and y is outer
+                            let mut sum = 0.0;
+                            let mut varb = 0.0;
+                            let mut varc = 0.0;
+                            for _ in 0..n {
+                                let x = rng.gen_range(a.i..a.f);
+                                let (yi, yf) = ((b.i)(x), (b.f)(x));
+                                let y = rng.gen_range(yi..yf);
+                                let (zi, zf) = ((c.i)(x,y), (c.f)(x,y));
+                                let z = rng.gen_range(zi..zf);
+                                sum += f(x,y,z);
+                                varb += yf - yi;
+                                varc += zf - zi;
+                            }
+                            return (sum / n as f64)*(a.f-a.i)*(varb / n as f64)*(varc / n as f64);
+                        } else if let Function::TwoD(_) = b.i { panic!("Both bound functions can't be 2D") } else {panic!("Fak1")}
+                    } else if let Function::OneD(_) = b.i {
+                        if let Function::TwoD(_) = c.i { // Meaning y is inner and z is outer
+                            let mut sum = 0.0;
+                            let mut varb = 0.0;
+                            let mut varc = 0.0;
+                            for _ in 0..n {
+                                let x = rng.gen_range(a.i..a.f);
+                                let (zi, zf) = ((c.i)(x), (c.f)(x));
+                                let z = rng.gen_range(zi..zf);
+                                let (yi, yf) = ((b.i)(x,z), (b.f)(x,z));
+                                let y = rng.gen_range(yi..yf);
+                                sum += f(x,y,z);
+                                varb += yf - yi;
+                                varc += zf - zi;
+                            }
+                            return (sum / n as f64)*(a.f-a.i)*(varb / n as f64)*(varc / n as f64);
+                        } else if let Function::OneD(_) = c.i { panic!("Use a 2D function and a 1D function, with the 2D being the inner function, even if you don't use one of the variables")}  else {panic!("Fak2")}
+                    } else {panic!("One function needs to be 2D and one 1D")}
+                },
+                (_, _, _) => panic!("All three integral limits can't be functions")*/
+        }
+    } else { panic!("3D functions require 3 bounds") }
+}
+macro_rules! int_montecarlo {
+    ($f:expr, $a:expr, $b:expr, $n:expr) => {int_monte_carlo_2d(&$f, $a, $b, $n)};
+    ($f:expr, $a:expr, $b:expr, $c:expr, $n:expr) => {int_monte_carlo_3d(&$f, $a, $b, $c, $n)};
+}
+fn int_midpint_2d(f:&Function, a:&SuperSet, b:&SuperSet, h:f64) -> f64 {
+    if let Function::TwoD(_) = f {
+        let mut sum = 0.0;
+        match (a, b) {
+            (SuperSet::Set(a), SuperSet::Set(b)) => {
+                let mut x = a.i + 0.5*h;
+                let mut y;
+                while x < a.f {
+                    y = b.i + 0.5*h;
+                    while y < b.f {
+                        sum += f(x, y)*h.powi(2);
+                        y += h;
+                    }
+                    x += h;
+                }
+                sum
+            },
+            (SuperSet::Set(a), SuperSet::FSet(b)) => {
+                let mut x = a.i + 0.5*h;
+                let mut y;
+                while x < a.f {
+                    y = (b.i)(x) + 0.5*h;
+                    while y < (b.f)(x) {
+                        sum += f(x, y)*h.powi(2);
+                        y += h;
+                    }
+                    x += h;
+                }
+                sum
+            },
+            (SuperSet::FSet(a), SuperSet::Set(b)) => {
+                let mut y = b.i + 0.5*h;
+                let mut x;
+                while y < b.f {
+                    x = (a.i)(y) + 0.5*h;
+                    while y < (a.f)(x) {
+                        sum += f(x, y)*h.powi(2);
+                        x += h;
+                    }
+                    y += h;
+                }
+                sum
+            },
+            (_, _) => panic!("Both bounds can't be functions")
+        }
+    } else { panic!("2D Functions require 2 bounds") }
+}
+fn int_simpson_2d(f:&Function, a:&SuperSet, b:&SuperSet, h:f64) -> f64 {
+    if let Function::TwoD(_) = f {
+        let mut sum = 0.0;
+        match (a, b) {
+            (SuperSet::Set(a), SuperSet::Set(b)) => {
+                let mut x = a.i;
+                let mut y;
+                while x < a.f {
+                    y = b.i + 0.5*h;
+                    while y < b.f {
+                        let mdpt_vol = f(x+0.5*h, y+0.5*h)*h.powi(2);
+                        let trap_vol = 0.25*h.powi(2)*(f(x, y) + f(x+h, y) + f(x, y+h) + f(x+h, y+h));
+                        sum += (2.*mdpt_vol+trap_vol)/3.;
+                        y += h;
+                    }
+                    x += h;
+                }
+                sum
+            },
+            (SuperSet::Set(a), SuperSet::FSet(b)) => {
+                let mut x = a.i;
+                let mut y = 0.0;
+                while x < a.f {
+                    y = (b.i)(x) + 0.5*h;
+                    while y < (b.f)(x) {
+                        let mdpt_vol = f(x+0.5*h, y+0.5*h)*h.powi(2);
+                        let trap_vol = 0.25*h.powi(2)*(f(x, y) + f(x+h, y) + f(x, y+h) + f(x+h, y+h));
+                        sum += (2.*mdpt_vol+trap_vol)/3.;
+                        y += h;
+                    }
+                    x += h;
+                }
+                sum
+            },
+            (SuperSet::FSet(a), SuperSet::Set(b)) => {
+                let mut y = b.i;
+                let mut x = 0.0;
+                while y < b.f {
+                    x = (a.i)(x) + 0.5*h;
+                    while x < (a.f)(y) {
+                        let mdpt_vol = f(x+0.5*h, y+0.5*h)*h.powi(2);
+                        let trap_vol = 0.25*h.powi(2)*(f(x, y) + f(x+h, y) + f(x, y+h) + f(x+h, y+h));
+                        sum += (2.*mdpt_vol+trap_vol)/3.;
+                        x += h;
+                    }
+                    y += h;
+                }
+                sum
+            },
+            (_, _) => panic!("Both bounds can't be functions")
+        }
+    } else { panic!("2D Functions require 2 bounds") }
 }
 // General Function Wrapper
 enum _G<'s> {
@@ -1501,170 +1766,136 @@ pub fn integral_1d(f:&Function, set:&Set, method:IntegrationMethod) -> f64 {
 }
 
 // ----- DOUBLE/TRIPLE INTEGRAL -----
-pub fn rn_integral(f:&Function, lim:Vec<SuperSet>, n:i32) -> f64 {
-    let mut rng = rand::thread_rng();
+pub fn rn_integral(f:&Function, lim:Vec<SuperSet>, method:MultipleIntegrationMethod) -> f64 {
     match (f, lim.len()) {
         (Function::TwoD(_), 2) => {
-            match (&lim[0], &lim[1]) {
-                (SuperSet::Set(a), SuperSet::Set(b)) => { // any
-                    let mut sum = 0.0;
-                    for _ in 0..n {
-                        let x = rng.gen_range(a.i..a.f);
-                        let y = rng.gen_range(b.i..b.f);
-                        sum += f(x, y);
-                    }
-                    return (sum / n as f64) * (a.f - a.i) * (b.f - b.i);
-                }
-                (SuperSet::Set(a), SuperSet::FSet(b)) => { // dy dx
-                    if let Function::OneD(_) = b.i {
-                        let mut sum = 0.0;
-                        let mut var = 0.0;
-                        for _ in 0..n {
-                            let x = rng.gen_range(a.i..a.f);
-                            let (yi, yf) = ((b.i)(x), (b.f)(x));
-                            let y = rng.gen_range(yi..yf);
-                            sum += f(x, y);
-                            var += yf - yi;
-                        }
-                        return (sum / n as f64)*(a.f - a.i)*(var / n as f64);
-                    } else { panic!("Function limits for this double integral need to be 1D") }
-                },
-                (SuperSet::FSet(a), SuperSet::Set(b)) => { // dx dy
-                    if let Function::OneD(_) = a.i {
-                        let mut sum = 0.0;
-                        let mut var = 0.0;
-                        for _ in 0..n {
-                            let y = rng.gen_range(b.i..b.f);
-                            let (xi, xf) = ((a.i)(y), (a.f)(y));
-                            let x = rng.gen_range(xi..xf);
-                            sum += f(x, y);
-                            var += xf - xi;
-                        }
-                        return (sum / (n as f64))*(b.f - b.i)*(var / n as f64);
-                    } else { panic!("Function limits for this double integral need to be 1D") }
-                },
-                (_, _) => panic!("Both integral limits can't be functions")
+            match method {
+                MultipleIntegrationMethod::MonteCarlo(n) => int_monte_carlo_2d(f, &lim[0], &lim[1], n),
+                MultipleIntegrationMethod::MidPoint(h) => int_midpint_2d(f, &lim[0], &lim[1], h),
+                MultipleIntegrationMethod::Simpson(h) => int_simpson_2d(f, &lim[0], &lim[1], h)
             }
         },
         (Function::ThreeD(_), 3) => {
             match (&lim[0], &lim[1], &lim[2]) {
-                (SuperSet::Set(a), SuperSet::Set(b), SuperSet::Set(c)) => { // any
-                    let mut sum = 0.0;
-                    for _ in 0..n {
-                        let x = rng.gen_range(a.i..a.f);
-                        let y = rng.gen_range(b.i..b.f);
-                        let z = rng.gen_range(c.i..c.f);
-                        sum += f(x, y, z);
+                (SuperSet::Set(_), SuperSet::Set(_), SuperSet::Set(_)) => {
+                    match method {
+                        MultipleIntegrationMethod::MonteCarlo(n) => int_monte_carlo_3d(f, &lim[0], &lim[1], &lim[2], n),
+                        MultipleIntegrationMethod::MidPoint(_) => panic!("No mid point method yet for 3D functions"),
+                        MultipleIntegrationMethod::Simpson(_) => f64::NAN
                     }
-                    return (sum / n as f64)*(a.f-a.i)*(b.f-b.i)*(c.f-c.i)
                 },
-                (_, _, _) => panic!("Triple integrals with variable bounds not supported yet"),
-                /*(SuperSet::Set(a), SuperSet::Set(b), SuperSet::FSet(c)) => { // dz dx dy | dz dy dx
-                    if let Function::TwoD(_) = c.i {
-                        let mut sum = 0.0;
-                        let mut var = 0.0;
-                        for _ in 0..n {
-                            let x = rng.gen_range(a.i..a.f);
-                            let y = rng.gen_range(b.i..b.f);
-                            let (zi, zf) = ((c.i)(x, y), (c.f)(x , y));
-                            let z = rng.gen_range(zi..zf);
-                            sum += f(x, y, z);
-                            var += zf - zi;
-                        }
-                        return (sum / n as f64)*(a.f-a.i)*(b.f-b.i)*(var / n as f64);
-                    } else if let Function::OneD(_) = c.i {
-                        panic!("Make the dy functions a 2D function and not use the other parameter to specify")
-                    } else { panic!("dy has to be a 2D function set")}
-                },
-                (SuperSet::Set(a), SuperSet::FSet(b), SuperSet::Set(c)) => { // dy dx dz | dy dz dx
-                    if let Function::TwoD(_) = b.i {
-                        let mut sum = 0.0;
-                        let mut var = 0.0;
-                        for _ in 0..n {
-                            let x = rng.gen_range(a.i..a.f);
-                            let z = rng.gen_range(c.i..c.f);
-                            let (yi, yf) = ((b.i)(x, z), (b.f)(x , z));
-                            let y = rng.gen_range(yi..yf);
-                            sum += f(x, y, z);
-                            var += yf - yi;
-                        }
-                        return (sum / n as f64)*(a.f-a.i)*(c.f-c.i)*(var / n as f64);
-                    } else if let Function::OneD(_) = b.i {
-                        panic!("Make the dz functions a 2D function and not use the other parameter to specify")
-                    } else { panic!("dz has to be a 2D function set")}
-                },
-                (SuperSet::FSet(a), SuperSet::Set(b), SuperSet::Set(c)) => { // dx dy dz | dx dz dy
-                    if let Function::TwoD(_) = a.i {
-                        let mut sum = 0.0;
-                        let mut var = 0.0;
-                        for _ in 0..n {
-                            let x = rng.gen_range(b.i..b.f);
-                            let z = rng.gen_range(c.i..c.f);
-                            let (xi, xf) = ((a.i)(x, z), (a.f)(x , z));
-                            let y = rng.gen_range(xi..xf);
-                            sum += f(x, y, z);
-                            var += xf - xi;
-                        }
-                        return (sum / n as f64)*(b.f-b.i)*(c.f-c.i)*(var / n as f64);
-                    } else if let Function::OneD(_) = a.i {
-                        panic!("Make the dx functions a 2D function and not use the other parameter to specify")
-                    } else { panic!("dx has to be a 2D function set")}
-                },
-                (SuperSet::Set(a), SuperSet::FSet(b), SuperSet::FSet(c)) => { // dz dx dy | dz dy dx
-                    if let Function::TwoD(_) = c.i {
-                        if let Function::OneD(_) = b.i { // Meaning z is inner and y is outer
-                            let mut sum = 0.0;
-                            let mut varb = 0.0;
-                            let mut varc = 0.0;
-                            for _ in 0..n {
-                                let x = rng.gen_range(a.i..a.f);
-                                let (yi, yf) = ((b.i)(x), (b.f)(x));
-                                let y = rng.gen_range(yi..yf);
-                                let (zi, zf) = ((c.i)(x,y), (c.f)(x,y));
-                                let z = rng.gen_range(zi..zf);
-                                sum += f(x,y,z);
-                                varb += yf - yi;
-                                varc += zf - zi;
-                            }
-                            return (sum / n as f64)*(a.f-a.i)*(varb / n as f64)*(varc / n as f64);
-                        } else if let Function::TwoD(_) = b.i { panic!("Both bound functions can't be 2D") } else {panic!("Fak1")}
-                    } else if let Function::OneD(_) = b.i {
-                        if let Function::TwoD(_) = c.i { // Meaning y is inner and z is outer
-                            let mut sum = 0.0;
-                            let mut varb = 0.0;
-                            let mut varc = 0.0;
-                            for _ in 0..n {
-                                let x = rng.gen_range(a.i..a.f);
-                                let (zi, zf) = ((c.i)(x), (c.f)(x));
-                                let z = rng.gen_range(zi..zf);
-                                let (yi, yf) = ((b.i)(x,z), (b.f)(x,z));
-                                let y = rng.gen_range(yi..yf);
-                                sum += f(x,y,z);
-                                varb += yf - yi;
-                                varc += zf - zi;
-                            }
-                            return (sum / n as f64)*(a.f-a.i)*(varb / n as f64)*(varc / n as f64);
-                        } else if let Function::OneD(_) = c.i { panic!("Use a 2D function and a 1D function, with the 2D being the inner function, even if you don't use one of the variables")}  else {panic!("Fak2")}
-                    } else {panic!("One function needs to be 2D and one 1D")}
-                },
-                (_, _, _) => panic!("All three integral limits can't be functions")*/
+                (_, _, _) => panic!("Triple integration with non-constant bounds is not available as of the current version")
             }
         },
         (_, _) => panic!("Need 3 bounds for 3D functions and 2 bounds for 2D functions")
     }
 }
+// Integration methods wrapper
+pub enum _M {
+    Single(IntegrationMethod),
+    Multi(MultipleIntegrationMethod)
+}
+// Integration arguments wrapper
+pub enum _W<'s> {
+    Number(f64),
+    SSet(SuperSet<'s>),
+    Method(_M),
+}
+trait WWrap {
+    fn wwrap(&self) -> _W;
+}
+impl WWrap for f64 {
+    fn wwrap(&self) -> _W {
+        _W::Number(*self)
+    }
+}
+impl WWrap for Set {
+    fn wwrap(&self) -> _W {
+        _W::SSet(self.wrap())
+    }
+}
+impl WWrap for FSet {
+    fn wwrap(&self) -> _W {
+        _W::SSet(self.wrap())
+    }
+}
+impl WWrap for IntegrationMethod {
+    fn wwrap(&self) -> _W {
+        _W::Method(_M::Single(self.clone()))
+    }
+}
+impl WWrap for MultipleIntegrationMethod {
+    fn wwrap(&self) -> _W {
+        _W::Method(_M::Multi(self.clone()))
+    }
+}
+pub fn categorize_integrals(f:&Function, args:Vec<_W>) -> f64 {
+    match args.len() {
+        1 => { // 1D set default
+            match &args[0] {
+                _W::SSet(s) => if let SuperSet::Set(s) = s {
+                    return integral_1d(f, s, IntegrationMethod::GaussLegendre);
+                } else { panic!("E071") }
+                _ => panic!("E072")
+            }
+        },
+        2 => { // 1D num default | 1D set specify | 2D sets default
+            match (&args[0], &args[1]) {
+                (_W::Number(a), _W::Number(b)) => {
+                    return integral_1d(f, &set![*a, *b], IntegrationMethod::GaussLegendre);
+                },
+                (_W::SSet(s), _W::Method(m)) => {
+                    if let SuperSet::Set(s) = s {
+                        if let _M::Single(m) = m {
+                            return integral_1d(f, *s, m.clone());
+                        } else { panic!("1D functions can only take methods from the IntegrationMethod enum") }
+                    } else { panic!("E074") }
+                },
+                (_W::SSet(x), _W::SSet(y)) => {
+                    return rn_integral(f, vec![x.clone(), y.clone()], MultipleIntegrationMethod::MonteCarlo(400));
+                }
+                (_, _) => panic!("E075")
+            }
+        },
+        3 => { // 2D sets specify | 3D sets default
+            match (&args[0], &args[1], &args[2]) {
+                (_W::SSet(x), _W::SSet(y), _W::Method(m)) => {
+                    if let _M::Multi(m) = m {
+                        return rn_integral(f, vec![x.clone(), y.clone()], m.clone());
+                    } else { panic!("2D functions can only take methods from the MultipleIntegrationMethod enum") }
+                },
+                (_W::SSet(x), _W::SSet(y), _W::SSet(z)) => {
+                    return rn_integral(f, vec![x.clone(), y.clone(), z.clone()], MultipleIntegrationMethod::MonteCarlo(400));
+                },
+                (_, _, _) => panic!("E076")
+            }
+        },
+        4 => { // 3D sets specify
+            match (&args[0], &args[1], &args[2], &args[3]) {
+                (_W::SSet(x), _W::SSet(y), _W::SSet(z), _W::Method(m)) => {
+                    if let _M::Multi(m) = m {
+                        return rn_integral(f, vec![x.clone().clone(), y.clone().clone(), z.clone().clone()], m.clone());
+                    } else { panic!("3D functions can only take methods from the MultipleIntegrationMethod enum") }
+                },
+                (_, _, _, _) => panic!("E077")
+            }
+        },
+        _ => panic!("Why you put so many arguments in here, bro?")
+    }
+}
+#[macro_export]
 macro_rules! integral {
-    ($f:expr, $s:expr) => {
-        integral_1d(&$f, &$s, IntegrationMethod::GaussLegendre)
+    ($f:expr, $s:expr) => { // 1D set default
+        categorize_integrals(&$f, vec![$s.wwrap()])
     };
-    ($f:expr, $s:expr, $m:expr) => {
-        integral_1d(&$f, &$s, $m)
+    ($f:expr, $asx:expr, $bmy:expr) => { // 1D num default | 1D set specify | 2D sets default
+        categorize_integrals(&$f, vec![$asx.wwrap(), $bmy.wwrap()])
     };
-    ($f:expr, $x:expr, $y:expr, $n:expr) => {
-        rn_integral(&$f, vec![$x.wrap(), $y.wrap()], $n)
+    ($f:expr, $x:expr, $y:expr, $mz:expr) => { // 2D sets specify | 3D sets default
+        categorize_integrals(&$f, vec![$x.wwrap(), $y.wwrap(), $mz.wwrap()])
     };
-    ($f:expr, $x:expr, $y:expr, $z:expr, $n:expr) => {
-        rn_integral(&$f, vec![$x.wrap(), $y.wrap(), $z.wrap()], $n)
+    ($f:expr, $x:expr, $y:expr, $z:expr, $m:expr) => { // 3D - specified
+        categorize_integrals(&$f, vec![$x.wwrap(), $y.wwrap(), $z.wwrap(), $m.wwrap()])
     };
 }
 
@@ -1701,7 +1932,7 @@ impl<'s> Surface<'s> {
         self.f.ddv(u, v)
     }
     pub fn area(&self) -> f64 {
-        surface_integral(&f!(x, y, z, 1.).wrap(), &self, 400)
+        surface_integral(&f!(x, y, z, 1.).wrap(), &self, MultipleIntegrationMethod::MonteCarlo(400))
     }
 }
 impl FnOnce<(f64, f64)> for ParametricSurface {
@@ -1791,7 +2022,7 @@ macro_rules! surface {
 }
 
 // ----- SURFACE INTEGRAL -----
-pub fn surface_integral(g:&_G, s:&Surface, n:i32) -> f64 {
+pub fn surface_integral(g:&_G, s:&Surface, m:MultipleIntegrationMethod) -> f64 {
     let s_clone = s.clone();
     let (u, v): (SuperSet, SuperSet) = (s_clone.u_lim, s_clone.v_lim);
     let s = s_clone.f;
@@ -1804,7 +2035,7 @@ pub fn surface_integral(g:&_G, s:&Surface, n:i32) -> f64 {
                     }),
                     expression: String::from("")
                 });
-                rn_integral(&fuv, vec![u, v], n)
+                rn_integral(&fuv, vec![u, v], m)
             } else { panic!("No surface integrals for 1D and 2D functions") }
         }
         _G::VectorFunction(f) => {
@@ -1816,17 +2047,47 @@ pub fn surface_integral(g:&_G, s:&Surface, n:i32) -> f64 {
                     }),
                     expression: String::from("")
                 });
-                rn_integral(&vuv, vec![u, v], n)
+                rn_integral(&vuv, vec![u, v], m)
             } else { panic!("No surface integrals for 1D and 2D vector functions") }
         }
     }
 }
+#[macro_export]
 macro_rules! surface_integral {
-    ($f:expr, $s:expr) => { surface_integral(&$f.wrap(), &$s, 250) };
-    ($f:expr, $s:expr, $n:expr) => { surface_integral(&$f.wrap(), &$s, $n) };
+    ($f:expr, $s:expr) => { surface_integral(&$f.wrap(), &$s, MultipleIntegrationMethod::MonteCarlo(400)) };
+    ($f:expr, $s:expr, $m:expr) => { surface_integral(&$f.wrap(), &$s, $m) };
 }
 
+// ----- CONFIG -----
+#[macro_export]
+macro_rules! setup {
+    () => {
+        use $crate::{IntegrationMethod::{self, *}, MultipleIntegrationMethod::{self, *}};
+        use std::f64::consts::{PI, E};
+    };
+}
+
+// ----- HELPERS ------
+#[macro_export]
+macro_rules! sin {
+    ($x:expr) => {$x.sin()};
+}
+#[macro_export]
+macro_rules! cos {
+    ($x:expr) => {$x.cos()};
+}
+#[macro_export]
+macro_rules! tan {
+    ($x:expr) => {$x.tan()};
+}
+#[macro_export]
+macro_rules! ln {
+    ($x:expr) => {$x.ln()};
+}
+
+
 use std::f64::consts::{PI, E};
+
 #[cfg(test)]
 mod tests {
     use super::*;
@@ -1860,7 +2121,7 @@ mod tests {
     fn vector_functions() {
         let F:VectorFunction = vector_function!(x, y, -y, x);
         println!("F(1,2) = {:.5}", F(1., 2.));
-        println!("∂F/∂y = {}", dvdy!(F, 1, 2));
+        println!("∂F/∂y = {}", ddyv!(F, 1, 2));
         println!("|∇xF(1, 2)| = {:.5}", !curl!(F, 1, 2));
 
         let g = f!(x, y, z, x + y +z);
@@ -1897,10 +2158,10 @@ mod tests {
         let f = f!(x, y, (x.powi(4)+1.).sqrt());
         let x_bounds = fset![f!(y, y.powf(1./3.)), f!(y, 2.)];
         let y_bounds = set![0, 8];
-        let a:f64 = integral!(f, x_bounds, y_bounds, 1_000);
-        assert!(near!(a, (1./6.)*(17_f64.powf(1.5)-1.); 2.));
+        let a:f64 = integral!(f, x_bounds, y_bounds, MultipleIntegrationMethod::MonteCarlo(1_000));
+        assert!(near!(a, (1./6.)*(17_f64.powf(1.5)-1.); 2.2));
 
-        assert!(near!(integral!(f!(x, y, z, x*y + z), set![0, 2], set![0, 3], set![0, 1], 2000), 12.; 0.5));
+        assert!(near!(integral!(f!(x, y, z, x*y + z), set![0, 2], set![0, 3], set![0, 1], MultipleIntegrationMethod::MonteCarlo(2_000)), 12.; 0.5));
 
         /*let g = f!(x, y, z, 1.);
         println!("Int 3 = {}", rn_integral(&g, vec![fset![f!(y, z, 0.), f!(y, z, 1.-z)].wrap(), set![0, 2].wrap(), set![0, 1].wrap()], 2000));
@@ -1909,13 +2170,25 @@ mod tests {
     }
     #[test]
     fn surfaces() {
+        setup!();
         let v = vector_function!(x, y, z, x, y, z);
         let s:Surface = surface!(u, v, u.sin()*v.cos(), u.sin()*v.sin(), u.cos(), 0, PI/2., 0, 2.*PI);
         let rho = surface!(u, v, u+v, u*v, u.powf(v), set![0, 2.*PI], set![0, 10]);
         assert!(near_v!(s(PI, PI/2.), vector!(0, 0, -1)));
 
-        let b:f64 = surface_integral!(v, s, 100);
+        let b:f64 = surface_integral!(v, s, Simpson(0.005));
         println!("a = {}", s.area());
         println!("b = {}", b);
+    }
+
+    #[test]
+    fn integral_test() {
+        setup!();
+        let f = f!(x, x.powi(2));
+        let g = f!(x, y, x*y);
+        let a = integral!(f, set![0, 2], Simpson13(10));
+        let b = integral!(g, set![0, 2], set![0, 3]);
+
+        println!("a = {}    b = {}", a, b);
     }
 }
