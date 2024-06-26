@@ -26,6 +26,7 @@ to contours.
 - v0.05 - Generalized the integral macro, addded macros for sin, cos, tan, and ln, 
 added multiple double integration methods, and a setup macro for importing the 
 IntegrationMethod and MultipleIntegrationMethod's variants, as well as pi and e.
+- v0.051 - Some restructuring, generalized the near! macro.
 # Usage
 To use the library, the project will have to be using the nightly toolchain,
 for which you can copy the "rust-toolchain.toml" file.\

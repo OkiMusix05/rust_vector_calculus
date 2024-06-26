@@ -1,24 +1,33 @@
 #![feature(unboxed_closures, fn_traits)]
 use std::fmt::{Display, Formatter};
 use dyn_clone::DynClone;
-use std::cmp::{min, max};
+//use std::cmp::{min, max};
 use rand::Rng;
+// ----- IDEAS -----
+// - Change of variables (Jacobian)
+// - Solve equations for Function = 0
+// - Lagrange multipliers
+// - Flux Lines for Vector Functions
+// - Differential equations solver
 
+// ----- GLOBAL CONSTANTS -----
+/// # General Error
+/// The error Δ = 5*10^-6
 const Δ:f64 = 5e-6;
 
 // ----- VECTORS -----
 #[derive(Copy, Clone, Debug)]
-pub struct Vector2 {
+pub struct _Vector2 {
     pub x:f64,
     pub y:f64
 }
 #[derive(Copy, Clone, Debug)]
-pub struct Vector3 {
+pub struct _Vector3 {
     pub x:f64,
     pub y:f64,
     pub z:f64
 }
-impl Vector2 {
+impl _Vector2 {
     pub fn new(x:f64, y:f64) -> Self {
         Self { x, y }
     }
@@ -29,7 +38,7 @@ impl Vector2 {
         (self.x, self.y)
     }
 }
-impl Vector3 {
+impl _Vector3 {
     pub fn new(x:f64, y:f64, z:f64) -> Self {
         Self { x, y, z}
     }
@@ -42,43 +51,43 @@ impl Vector3 {
 }
 // Dot products for Vector2,3 where moved into Vector
 // Cross product for Vector2,3
-impl std::ops::Rem for Vector2 {
+impl std::ops::Rem for _Vector2 {
     type Output = f64;
     fn rem(self, rhs: Self) -> Self::Output {
         self.x*rhs.y - self.y*rhs.x
     }
 }
-impl std::ops::Rem for Vector3 {
-    type Output = Vector3;
+impl std::ops::Rem for _Vector3 {
+    type Output = _Vector3;
     fn rem(self, rhs: Self) -> Self::Output {
-        Vector3 {
+        _Vector3 {
             x: self.y*rhs.z - self.z*rhs.y,
             y: self.z*rhs.x - self.x*rhs.z,
             z: self.x*rhs.y - self.y*rhs.x,
         }
     }
 }
-impl Display for Vector2 {
+impl Display for _Vector2 {
     fn fmt(&self, f: &mut Formatter<'_>) -> std::fmt::Result {
         write!(f, "⟨{:.5}, {:.5}⟩", self.x, self.y)
     }
 }
-impl Display for Vector3 {
+impl Display for _Vector3 {
     fn fmt(&self, f: &mut Formatter<'_>) -> std::fmt::Result {
         write!(f, "⟨{:.5}, {:.5}, {:.5}⟩", self.x, self.y, self.z)
     }
 }
 #[derive(Copy, Clone, Debug)]
 pub enum Vector {
-    TwoD(Vector2),
-    ThreeD(Vector3)
+    TwoD(_Vector2),
+    ThreeD(_Vector3)
 }
 impl Vector {
     pub fn new_2d(x:f64, y:f64) -> Self {
-        Vector::TwoD(Vector2 { x, y, })
+        Vector::TwoD(_Vector2 { x, y, })
     }
     pub fn new_3d(x:f64, y:f64, z:f64) -> Self {
-        Vector::ThreeD(Vector3 { x, y, z })
+        Vector::ThreeD(_Vector3 { x, y, z })
     }
     pub fn x(&self) -> f64 {
         match self {
@@ -126,11 +135,11 @@ impl std::ops::Mul<f64> for Vector {
 
     fn mul(self, scalar: f64) -> Self::Output {
         match self {
-            Vector::TwoD(v) => Vector::TwoD(Vector2 {
+            Vector::TwoD(v) => Vector::TwoD(_Vector2 {
                 x: v.x * scalar,
                 y: v.y * scalar,
             }),
-            Vector::ThreeD(v) => Vector::ThreeD(Vector3 {
+            Vector::ThreeD(v) => Vector::ThreeD(_Vector3 {
                 x: v.x * scalar,
                 y: v.y * scalar,
                 z: v.z * scalar,
@@ -143,11 +152,11 @@ impl std::ops::Mul<Vector> for f64 {
 
     fn mul(self, v: Vector) -> Self::Output {
         match v {
-            Vector::TwoD(v) => Vector::TwoD(Vector2 {
+            Vector::TwoD(v) => Vector::TwoD(_Vector2 {
                 x: v.x * self,
                 y: v.y * self,
             }),
-            Vector::ThreeD(v) => Vector::ThreeD(Vector3 {
+            Vector::ThreeD(v) => Vector::ThreeD(_Vector3 {
                 x: v.x * self,
                 y: v.y * self,
                 z: v.z * self,
@@ -161,11 +170,11 @@ impl std::ops::Mul<i32> for Vector {
     fn mul(self, scalar: i32) -> Self::Output {
         let scalar = scalar as f64;
         match self {
-            Vector::TwoD(v) => Vector::TwoD(Vector2 {
+            Vector::TwoD(v) => Vector::TwoD(_Vector2 {
                 x: v.x * scalar,
                 y: v.y * scalar,
             }),
-            Vector::ThreeD(v) => Vector::ThreeD(Vector3 {
+            Vector::ThreeD(v) => Vector::ThreeD(_Vector3 {
                 x: v.x * scalar,
                 y: v.y * scalar,
                 z: v.z * scalar,
@@ -178,11 +187,11 @@ impl std::ops::Mul<Vector> for i32 {
 
     fn mul(self, v: Vector) -> Self::Output {
         match v {
-            Vector::TwoD(v) => Vector::TwoD(Vector2 {
+            Vector::TwoD(v) => Vector::TwoD(_Vector2 {
                 x: v.x * self as f64,
                 y: v.y * self as f64,
             }),
-            Vector::ThreeD(v) => Vector::ThreeD(Vector3 {
+            Vector::ThreeD(v) => Vector::ThreeD(_Vector3 {
                 x: v.x * self as f64,
                 y: v.y * self as f64,
                 z: v.z * self as f64,
@@ -195,10 +204,10 @@ impl std::ops::Rem for Vector {
     type Output = Vector;
     fn rem(self, rhs: Self) -> Self::Output {
         match (self, rhs) {
-            (Vector::TwoD(v1), Vector::TwoD(v2)) => Vector::ThreeD(Vector3::new(0., 0., v1%v2)),
+            (Vector::TwoD(v1), Vector::TwoD(v2)) => Vector::ThreeD(_Vector3::new(0., 0., v1%v2)),
             (Vector::ThreeD(v1), Vector::ThreeD(v2)) => Vector::ThreeD(v1%v2),
-            (Vector::TwoD(v1), Vector::ThreeD(v2)) => Vector::ThreeD(Vector3::new(v1.x, v1.y, 0.)%v2),
-            (Vector::ThreeD(v1), Vector::TwoD(v2)) => Vector::ThreeD(v1%Vector3::new(v2.x, v2.y, 0.)),
+            (Vector::TwoD(v1), Vector::ThreeD(v2)) => Vector::ThreeD(_Vector3::new(v1.x, v1.y, 0.)%v2),
+            (Vector::ThreeD(v1), Vector::TwoD(v2)) => Vector::ThreeD(v1% _Vector3::new(v2.x, v2.y, 0.)),
         }
     }
 }
@@ -269,61 +278,61 @@ impl<F> F3DClone for F
 dyn_clone::clone_trait_object!(F1DClone<Output=f64>);
 dyn_clone::clone_trait_object!(F2DClone<Output=f64>);
 dyn_clone::clone_trait_object!(F3DClone<Output=f64>);
-pub struct Function1D {
+pub struct _Function1D {
     pub f:Box<dyn F1DClone<Output=f64>>,
     pub expression:String
 }
-impl Function1D {
+impl _Function1D {
     fn call(&self, x:f64) -> f64 {
         (self.f)(x)
     }
 }
-pub struct Function2D {
+pub struct _Function2D {
     pub f:Box<dyn F2DClone<Output=f64>>,
     pub expression:String
 }
-impl Function2D {
+impl _Function2D {
     fn call(&self, x:f64, y:f64) -> f64 {
         (self.f)(x, y)
     }
 }
-pub struct Function3D {
+pub struct _Function3D {
     pub f:Box<dyn F3DClone<Output=f64>>,
     pub expression:String
 }
-impl Function3D {
+impl _Function3D {
     fn call(&self, x:f64, y:f64, z:f64) -> f64 {
         (self.f)(x, y, z)
     }
 }
-impl Clone for Function1D {
-    fn clone(&self) -> Function1D {
-        Function1D {
+impl Clone for _Function1D {
+    fn clone(&self) -> _Function1D {
+        _Function1D {
             f: dyn_clone::clone_box(&*self.f),
             expression: String::from(&*self.expression)
         }
     }
 }
-impl Clone for Function2D {
-    fn clone(&self) -> Function2D {
-        Function2D {
+impl Clone for _Function2D {
+    fn clone(&self) -> _Function2D {
+        _Function2D {
             f: dyn_clone::clone_box(&*self.f),
             expression: String::from(&*self.expression)
         }
     }
 }
-impl Clone for Function3D {
-    fn clone(&self) -> Function3D {
-        Function3D {
+impl Clone for _Function3D {
+    fn clone(&self) -> _Function3D {
+        _Function3D {
             f: dyn_clone::clone_box(&*self.f),
             expression: String::from(&*self.expression)
         }
     }
 }
 pub enum Function {
-    OneD(Function1D),
-    TwoD(Function2D),
-    ThreeD(Function3D)
+    OneD(_Function1D),
+    TwoD(_Function2D),
+    ThreeD(_Function3D)
 }
 impl Function {
     pub fn expression(&self) -> String {
@@ -400,19 +409,19 @@ impl Clone for Function {
 #[macro_export]
 macro_rules! f {
     ($x:ident, $f:expr) => {
-        Function::OneD(Function1D {
+        Function::OneD(_Function1D {
             f: Box::new(|$x:f64| $f),
             expression: String::from(stringify!($f))
         })
     };
     ($x:ident, $y:ident, $f:expr) => {
-        Function::TwoD(Function2D {
+        Function::TwoD(_Function2D {
             f: Box::new(|$x:f64, $y:f64| $f),
             expression: String::from(stringify!($f))
         })
     };
     ($x:ident, $y:ident, $z:ident, $f:expr) => {
-        Function::ThreeD(Function3D {
+        Function::ThreeD(_Function3D {
             f: Box::new(|$x:f64, $y:f64, $z:f64| $f),
             expression: String::from(stringify!($f))
         })
@@ -593,13 +602,13 @@ macro_rules! limit {
 
 // ----- VECTOR FUNCTIONS -----
 #[derive(Clone)]
-pub struct VectorFunction2D {
+pub struct _VectorFunction2D {
     pub f1:Function,
     pub f2:Function,
     pub potential: Option<Function>,
 }
 #[derive(Clone)]
-pub struct VectorFunction3D {
+pub struct _VectorFunction3D {
     pub f1:Function,
     pub f2:Function,
     pub f3:Function,
@@ -607,8 +616,8 @@ pub struct VectorFunction3D {
 }
 #[derive(Clone)]
 pub enum VectorFunction {
-    TwoD(VectorFunction2D),
-    ThreeD(VectorFunction3D)
+    TwoD(_VectorFunction2D),
+    ThreeD(_VectorFunction3D)
 }
 impl VectorFunction {
     fn potential(&self, args:Vec<f64>) -> f64 {
@@ -647,12 +656,12 @@ impl Display for VectorFunction {
 #[macro_export]
 macro_rules! vector_function {
     ($x:ident, $y:ident, $f1:expr, $f2:expr) => {
-        VectorFunction::TwoD(VectorFunction2D {
-            f1: Function::TwoD(Function2D {
+        VectorFunction::TwoD(_VectorFunction2D {
+            f1: Function::TwoD(_Function2D {
                 f: Box::new(|$x:f64, $y:f64| $f1),
                 expression: String::from(stringify!($f1))
             }),
-            f2: Function::TwoD(Function2D {
+            f2: Function::TwoD(_Function2D {
                 f: Box::new(|$x:f64, $y:f64| $f2),
                 expression: String::from(stringify!($f2))
             }),
@@ -660,16 +669,16 @@ macro_rules! vector_function {
         })
     };
     ($x:ident, $y:ident, $z:ident, $f1:expr, $f2:expr, $f3:expr) => {
-        VectorFunction::ThreeD(VectorFunction3D {
-            f1: Function::ThreeD(Function3D {
+        VectorFunction::ThreeD(_VectorFunction3D {
+            f1: Function::ThreeD(_Function3D {
                 f: Box::new(|$x:f64, $y:f64, $z:f64| $f1),
                 expression: String::from(stringify!($f1))
             }),
-            f2: Function::ThreeD(Function3D {
+            f2: Function::ThreeD(_Function3D {
                 f: Box::new(|$x:f64, $y:f64, $z:f64| $f2),
                 expression: String::from(stringify!($f2))
             }),
-            f3: Function::ThreeD(Function3D {
+            f3: Function::ThreeD(_Function3D {
                 f: Box::new(|$x:f64, $y:f64, $z:f64| $f3),
                 expression: String::from(stringify!($f3))
             }),
@@ -682,7 +691,7 @@ impl FnOnce<(f64, f64)> for VectorFunction {
 
     extern "rust-call" fn call_once(self, args: (f64, f64)) -> Self::Output {
         match self {
-            VectorFunction::TwoD(v) => Vector::TwoD(Vector2::new((v.f1)(args.0, args.1), (v.f2)(args.0, args.1))),
+            VectorFunction::TwoD(v) => Vector::TwoD(_Vector2::new((v.f1)(args.0, args.1), (v.f2)(args.0, args.1))),
             VectorFunction::ThreeD(_) => panic!("3D vector function can't take 2 arguments")
         }
     }
@@ -690,7 +699,7 @@ impl FnOnce<(f64, f64)> for VectorFunction {
 impl Fn<(f64, f64)> for VectorFunction {
     extern "rust-call" fn call(&self, args: (f64, f64)) -> Self::Output {
         match self {
-            VectorFunction::TwoD(v) => Vector::TwoD(Vector2::new((v.f1)(args.0, args.1), (v.f2)(args.0, args.1))),
+            VectorFunction::TwoD(v) => Vector::TwoD(_Vector2::new((v.f1)(args.0, args.1), (v.f2)(args.0, args.1))),
             VectorFunction::ThreeD(_) => panic!("3D vector function can't take 2 arguments")
         }
     }
@@ -698,7 +707,7 @@ impl Fn<(f64, f64)> for VectorFunction {
 impl FnMut<(f64, f64)> for VectorFunction {
     extern "rust-call" fn call_mut(&mut self, args: (f64, f64)) -> Self::Output {
         match self {
-            VectorFunction::TwoD(v) => Vector::TwoD(Vector2::new((v.f1)(args.0, args.1), (v.f2)(args.0, args.1))),
+            VectorFunction::TwoD(v) => Vector::TwoD(_Vector2::new((v.f1)(args.0, args.1), (v.f2)(args.0, args.1))),
             VectorFunction::ThreeD(_) => panic!("3D vector function can't take 2 arguments")
         }
     }
@@ -709,7 +718,7 @@ impl FnOnce<(f64, f64, f64)> for VectorFunction {
     extern "rust-call" fn call_once(self, args: (f64, f64, f64)) -> Self::Output {
         match self {
             VectorFunction::TwoD(_) => panic!("2D vector function can't take 3 arguments"),
-            VectorFunction::ThreeD(v) => Vector::ThreeD(Vector3::new((v.f1)(args.0, args.1, args.2), (v.f2)(args.0, args.1, args.2), (v.f3)(args.0, args.1, args.2)))
+            VectorFunction::ThreeD(v) => Vector::ThreeD(_Vector3::new((v.f1)(args.0, args.1, args.2), (v.f2)(args.0, args.1, args.2), (v.f3)(args.0, args.1, args.2)))
         }
     }
 }
@@ -717,7 +726,7 @@ impl Fn<(f64, f64, f64)> for VectorFunction {
     extern "rust-call" fn call(&self, args: (f64, f64, f64)) -> Self::Output {
         match self {
             VectorFunction::TwoD(_) => panic!("2D vector function can't take 3 arguments"),
-            VectorFunction::ThreeD(v) => Vector::ThreeD(Vector3::new((v.f1)(args.0, args.1, args.2), (v.f2)(args.0, args.1, args.2), (v.f3)(args.0, args.1, args.2)))
+            VectorFunction::ThreeD(v) => Vector::ThreeD(_Vector3::new((v.f1)(args.0, args.1, args.2), (v.f2)(args.0, args.1, args.2), (v.f3)(args.0, args.1, args.2)))
         }
     }
 }
@@ -725,7 +734,7 @@ impl FnMut<(f64, f64, f64)> for VectorFunction {
     extern "rust-call" fn call_mut(&mut self, args: (f64, f64, f64)) -> Self::Output {
         match self {
             VectorFunction::TwoD(_) => panic!("2D vector function can't take 3 arguments"),
-            VectorFunction::ThreeD(v) => Vector::ThreeD(Vector3::new((v.f1)(args.0, args.1, args.2), (v.f2)(args.0, args.1, args.2), (v.f3)(args.0, args.1, args.2)))
+            VectorFunction::ThreeD(v) => Vector::ThreeD(_Vector3::new((v.f1)(args.0, args.1, args.2), (v.f2)(args.0, args.1, args.2), (v.f3)(args.0, args.1, args.2)))
         }
     }
 }
@@ -736,14 +745,14 @@ impl FnOnce<(Vector,)> for VectorFunction {
         match self {
             VectorFunction::TwoD(f) => {
                 match args.0 {
-                    Vector::TwoD(v) => Vector::TwoD(Vector2::new((f.f1)(v.x, v.y), (f.f2)(v.x, v.y))),
+                    Vector::TwoD(v) => Vector::TwoD(_Vector2::new((f.f1)(v.x, v.y), (f.f2)(v.x, v.y))),
                     Vector::ThreeD(_) => panic!("3D vector passed to 2D vector function")
                 }
             }
             VectorFunction::ThreeD(f) => {
                 match args.0 {
-                    Vector::TwoD(v) => Vector::ThreeD(Vector3::new((f.f1)(v.x, v.y, 0.), (f.f2)(v.x, v.y, 0.), (f.f3)(v.x, v.y, 0.))),
-                    Vector::ThreeD(v) => Vector::ThreeD(Vector3::new((f.f1)(v.x, v.y, v.z), (f.f2)(v.x, v.y, v.z), (f.f3)(v.x, v.y, v.z)))
+                    Vector::TwoD(v) => Vector::ThreeD(_Vector3::new((f.f1)(v.x, v.y, 0.), (f.f2)(v.x, v.y, 0.), (f.f3)(v.x, v.y, 0.))),
+                    Vector::ThreeD(v) => Vector::ThreeD(_Vector3::new((f.f1)(v.x, v.y, v.z), (f.f2)(v.x, v.y, v.z), (f.f3)(v.x, v.y, v.z)))
                 }
             }
         }
@@ -754,14 +763,14 @@ impl Fn<(Vector,)> for VectorFunction {
         match self {
             VectorFunction::TwoD(f) => {
                 match args.0 {
-                    Vector::TwoD(v) => Vector::TwoD(Vector2::new((f.f1)(v.x, v.y), (f.f2)(v.x, v.y))),
+                    Vector::TwoD(v) => Vector::TwoD(_Vector2::new((f.f1)(v.x, v.y), (f.f2)(v.x, v.y))),
                     Vector::ThreeD(_) => panic!("3D vector passed to 2D vector function")
                 }
             }
             VectorFunction::ThreeD(f) => {
                 match args.0 {
-                    Vector::TwoD(v) => Vector::ThreeD(Vector3::new((f.f1)(v.x, v.y, 0.), (f.f2)(v.x, v.y, 0.), (f.f3)(v.x, v.y, 0.))),
-                    Vector::ThreeD(v) => Vector::ThreeD(Vector3::new((f.f1)(v.x, v.y, v.z), (f.f2)(v.x, v.y, v.z), (f.f3)(v.x, v.y, v.z)))
+                    Vector::TwoD(v) => Vector::ThreeD(_Vector3::new((f.f1)(v.x, v.y, 0.), (f.f2)(v.x, v.y, 0.), (f.f3)(v.x, v.y, 0.))),
+                    Vector::ThreeD(v) => Vector::ThreeD(_Vector3::new((f.f1)(v.x, v.y, v.z), (f.f2)(v.x, v.y, v.z), (f.f3)(v.x, v.y, v.z)))
                 }
             }
         }
@@ -772,14 +781,14 @@ impl FnMut<(Vector,)> for VectorFunction {
         match self {
             VectorFunction::TwoD(f) => {
                 match args.0 {
-                    Vector::TwoD(v) => Vector::TwoD(Vector2::new((f.f1)(v.x, v.y), (f.f2)(v.x, v.y))),
+                    Vector::TwoD(v) => Vector::TwoD(_Vector2::new((f.f1)(v.x, v.y), (f.f2)(v.x, v.y))),
                     Vector::ThreeD(_) => panic!("3D vector passed to 2D vector function")
                 }
             }
             VectorFunction::ThreeD(f) => {
                 match args.0 {
-                    Vector::TwoD(v) => Vector::ThreeD(Vector3::new((f.f1)(v.x, v.y, 0.), (f.f2)(v.x, v.y, 0.), (f.f3)(v.x, v.y, 0.))),
-                    Vector::ThreeD(v) => Vector::ThreeD(Vector3::new((f.f1)(v.x, v.y, v.z), (f.f2)(v.x, v.y, v.z), (f.f3)(v.x, v.y, v.z)))
+                    Vector::TwoD(v) => Vector::ThreeD(_Vector3::new((f.f1)(v.x, v.y, 0.), (f.f2)(v.x, v.y, 0.), (f.f3)(v.x, v.y, 0.))),
+                    Vector::ThreeD(v) => Vector::ThreeD(_Vector3::new((f.f1)(v.x, v.y, v.z), (f.f2)(v.x, v.y, v.z), (f.f3)(v.x, v.y, v.z)))
                 }
             }
         }
@@ -789,20 +798,20 @@ impl FnMut<(Vector,)> for VectorFunction {
 pub fn ddx_v(v:&VectorFunction, args:Vec<f64>) -> Vector {
     match v {
         VectorFunction::TwoD(v) => {
-            Vector::TwoD(Vector2::new(((v.f1)(args[0] + Δ, args[1])-(v.f1)(args[0], args[1]))/Δ,((v.f2)(args[0] + Δ, args[1])-(v.f2)(args[0], args[1]))/Δ))
+            Vector::TwoD(_Vector2::new(((v.f1)(args[0] + Δ, args[1])-(v.f1)(args[0], args[1]))/Δ, ((v.f2)(args[0] + Δ, args[1])-(v.f2)(args[0], args[1]))/Δ))
         },
         VectorFunction::ThreeD(v) => {
-            Vector::TwoD(Vector2::new(((v.f1)(args[0] + Δ, args[1], args[2])-(v.f1)(args[0], args[1], args[2]))/Δ,((v.f2)(args[0] + Δ, args[1], args[2])-(v.f2)(args[0], args[1], args[2]))/Δ))
+            Vector::TwoD(_Vector2::new(((v.f1)(args[0] + Δ, args[1], args[2])-(v.f1)(args[0], args[1], args[2]))/Δ, ((v.f2)(args[0] + Δ, args[1], args[2])-(v.f2)(args[0], args[1], args[2]))/Δ))
         }
     }
 }
 pub fn ddy_v(v:&VectorFunction, args:Vec<f64>) -> Vector {
     match v {
         VectorFunction::TwoD(v) => {
-            Vector::TwoD(Vector2::new(((v.f1)(args[0], args[1] + Δ)-(v.f1)(args[0], args[1]))/Δ,((v.f2)(args[0], args[1] + Δ)-(v.f2)(args[0], args[1]))/Δ))
+            Vector::TwoD(_Vector2::new(((v.f1)(args[0], args[1] + Δ)-(v.f1)(args[0], args[1]))/Δ, ((v.f2)(args[0], args[1] + Δ)-(v.f2)(args[0], args[1]))/Δ))
         },
         VectorFunction::ThreeD(v) => {
-            Vector::TwoD(Vector2::new(((v.f1)(args[0], args[1] + Δ, args[2])-(v.f1)(args[0], args[1], args[2]))/Δ,((v.f2)(args[0], args[1] + Δ, args[2])-(v.f2)(args[0], args[1], args[2]))/Δ))
+            Vector::TwoD(_Vector2::new(((v.f1)(args[0], args[1] + Δ, args[2])-(v.f1)(args[0], args[1], args[2]))/Δ, ((v.f2)(args[0], args[1] + Δ, args[2])-(v.f2)(args[0], args[1], args[2]))/Δ))
         }
     }
 }
@@ -812,7 +821,7 @@ pub fn ddz_v(v:&VectorFunction, args:Vec<f64>) -> Vector {
             panic!("Can't take partial with respect to z of a 2D vector function")
         },
         VectorFunction::ThreeD(v) => {
-            Vector::TwoD(Vector2::new(((v.f1)(args[0], args[1], args[2] + Δ)-(v.f1)(args[0], args[1], args[2]))/Δ,((v.f2)(args[0], args[1], args[2] + Δ)-(v.f2)(args[0], args[1], args[2]))/Δ))
+            Vector::TwoD(_Vector2::new(((v.f1)(args[0], args[1], args[2] + Δ)-(v.f1)(args[0], args[1], args[2]))/Δ, ((v.f2)(args[0], args[1], args[2] + Δ)-(v.f2)(args[0], args[1], args[2]))/Δ))
         }
     }
 }
@@ -882,12 +891,12 @@ pub fn grad(f:&Function) -> VectorFunction {
         Function::TwoD(_) => {
             let f1 = f.clone();
             let f2 = f.clone();
-            VectorFunction::TwoD(VectorFunction2D {
-                f1: Function::TwoD(Function2D {
+            VectorFunction::TwoD(_VectorFunction2D {
+                f1: Function::TwoD(_Function2D {
                     f: Box::new(move |x:f64, y:f64| ddy_s(&f1, vec![x, y])),
                     expression: format!("ddx({})", f.expression())
                 }),
-                f2: Function::TwoD(Function2D {
+                f2: Function::TwoD(_Function2D {
                     f: Box::new(move |x:f64, y:f64| ddy_s(&f2, vec![x, y])),
                     expression: format!("ddy({})", f.expression())
                 }),
@@ -898,16 +907,16 @@ pub fn grad(f:&Function) -> VectorFunction {
             let f1 = f.clone();
             let f2 = f.clone();
             let f3 = f.clone();
-            VectorFunction::ThreeD(VectorFunction3D {
-                f1: Function::ThreeD(Function3D {
+            VectorFunction::ThreeD(_VectorFunction3D {
+                f1: Function::ThreeD(_Function3D {
                     f: Box::new(move |x:f64, y:f64, z:f64| ddx_s(&f1, vec![x, y, z])),
                     expression: format!("ddx({})", f.expression())
                 }),
-                f2: Function::ThreeD(Function3D {
+                f2: Function::ThreeD(_Function3D {
                     f: Box::new(move |x:f64, y:f64, z:f64| ddy_s(&f2, vec![x, y, z])),
                     expression: format!("ddy({})", f.expression())
                 }),
-                f3: Function::ThreeD(Function3D {
+                f3: Function::ThreeD(_Function3D {
                     f: Box::new(move |x:f64, y:f64, z:f64| ddz_s(&f3, vec![x, y, z])),
                     expression: format!("ddz({})", f.expression())
                 }),
@@ -925,64 +934,64 @@ macro_rules! grad {
 
 // ----- PARAMETRIC CURVES -----
 #[derive(Clone)]
-pub struct ParametricCurve2D { // Supposed to be 1D
+pub struct _ParametricCurve2D { // Supposed to be 1D
     pub f1:Function,
     pub f2:Function,
 }
-impl ParametricCurve2D {
+impl _ParametricCurve2D {
     pub fn ddt(&self, t:f64) -> Vector {
-        Vector::TwoD(Vector2::new(((self.f1)(t + Δ) - (self.f1)(t))/Δ, ((self.f2)(t + Δ) - (self.f2)(t))/Δ))
+        Vector::TwoD(_Vector2::new(((self.f1)(t + Δ) - (self.f1)(t))/Δ, ((self.f2)(t + Δ) - (self.f2)(t))/Δ))
     }
 }
-impl FnOnce<(f64,)> for ParametricCurve2D {
+impl FnOnce<(f64,)> for _ParametricCurve2D {
     type Output = Vector;
 
     extern "rust-call" fn call_once(self, args: (f64,)) -> Self::Output {
-        Vector::TwoD(Vector2::new((self.f1)(args.0), (self.f2)(args.0)))
+        Vector::TwoD(_Vector2::new((self.f1)(args.0), (self.f2)(args.0)))
     }
 }
-impl FnMut<(f64,)> for ParametricCurve2D {
+impl FnMut<(f64,)> for _ParametricCurve2D {
     extern "rust-call" fn call_mut(&mut self, args: (f64,)) -> Self::Output {
-        Vector::TwoD(Vector2::new((self.f1)(args.0), (self.f2)(args.0)))
+        Vector::TwoD(_Vector2::new((self.f1)(args.0), (self.f2)(args.0)))
     }
 }
-impl Fn<(f64,)> for ParametricCurve2D {
+impl Fn<(f64,)> for _ParametricCurve2D {
     extern "rust-call" fn call(&self, args: (f64,)) -> Self::Output {
-        Vector::TwoD(Vector2::new((self.f1)(args.0), (self.f2)(args.0)))
+        Vector::TwoD(_Vector2::new((self.f1)(args.0), (self.f2)(args.0)))
     }
 }
 #[derive(Clone)]
-pub struct ParametricCurve3D {
+pub struct _ParametricCurve3D {
     pub f1:Function,
     pub f2:Function,
     pub f3:Function,
 }
-impl ParametricCurve3D {
+impl _ParametricCurve3D {
     pub fn ddt(&self, t:f64) -> Vector {
-        Vector::ThreeD(Vector3::new(((self.f1)(t + Δ) - (self.f1)(t))/Δ, ((self.f2)(t + Δ) - (self.f2)(t))/Δ, ((self.f3)(t + Δ) - (self.f3)(t))/Δ))
+        Vector::ThreeD(_Vector3::new(((self.f1)(t + Δ) - (self.f1)(t))/Δ, ((self.f2)(t + Δ) - (self.f2)(t))/Δ, ((self.f3)(t + Δ) - (self.f3)(t))/Δ))
     }
 }
-impl FnOnce<(f64,)> for ParametricCurve3D {
+impl FnOnce<(f64,)> for _ParametricCurve3D {
     type Output = Vector;
 
     extern "rust-call" fn call_once(self, args: (f64,)) -> Self::Output {
-        Vector::ThreeD(Vector3::new((self.f1)(args.0), (self.f2)(args.0), (self.f3)(args.0)))
+        Vector::ThreeD(_Vector3::new((self.f1)(args.0), (self.f2)(args.0), (self.f3)(args.0)))
     }
 }
-impl FnMut<(f64,)> for ParametricCurve3D {
+impl FnMut<(f64,)> for _ParametricCurve3D {
     extern "rust-call" fn call_mut(&mut self, args: (f64,)) -> Self::Output {
-        Vector::ThreeD(Vector3::new((self.f1)(args.0), (self.f2)(args.0), (self.f3)(args.0)))
+        Vector::ThreeD(_Vector3::new((self.f1)(args.0), (self.f2)(args.0), (self.f3)(args.0)))
     }
 }
-impl Fn<(f64,)> for ParametricCurve3D {
+impl Fn<(f64,)> for _ParametricCurve3D {
     extern "rust-call" fn call(&self, args: (f64,)) -> Self::Output {
-        Vector::ThreeD(Vector3::new((self.f1)(args.0), (self.f2)(args.0), (self.f3)(args.0)))
+        Vector::ThreeD(_Vector3::new((self.f1)(args.0), (self.f2)(args.0), (self.f3)(args.0)))
     }
 }
 #[derive(Clone)]
 pub enum ParametricCurve {
-    TwoD(ParametricCurve2D),
-    ThreeD(ParametricCurve3D)
+    TwoD(_ParametricCurve2D),
+    ThreeD(_ParametricCurve3D)
 }
 impl ParametricCurve {
     pub fn ddt(&self, t:f64) -> Vector {
@@ -1007,28 +1016,28 @@ impl Display for ParametricCurve {
 #[macro_export]
 macro_rules! curve {
     ($t:ident, $f1:expr, $f2:expr) => {
-        ParametricCurve::TwoD(ParametricCurve2D {
-            f1: Function::OneD(Function1D {
+        ParametricCurve::TwoD(_ParametricCurve2D {
+            f1: Function::OneD(_Function1D {
                 f: Box::new(|$t:f64| $f1),
                 expression: String::from(stringify!($f1))
             }),
-            f2: Function::OneD(Function1D {
+            f2: Function::OneD(_Function1D {
                 f: Box::new(|$t:f64| $f2),
                 expression: String::from(stringify!($f2))
             })
         })
     };
     ($t:ident, $f1:expr, $f2:expr, $f3:expr) => {
-        ParametricCurve::ThreeD(ParametricCurve3D {
-            f1: Function::OneD(Function1D {
+        ParametricCurve::ThreeD(_ParametricCurve3D {
+            f1: Function::OneD(_Function1D {
                 f: Box::new(|$t:f64| $f1),
                 expression: String::from(stringify!($f1))
             }),
-            f2: Function::OneD(Function1D {
+            f2: Function::OneD(_Function1D {
                 f: Box::new(|$t:f64| $f2),
                 expression: String::from(stringify!($f2))
             }),
-            f3: Function::OneD(Function1D {
+            f3: Function::OneD(_Function1D {
                 f: Box::new(|$t:f64| $f3),
                 expression: String::from(stringify!($f3))
             })
@@ -1067,16 +1076,16 @@ macro_rules! ddt {
 
 // ----- SETS -----
 trait Super {
-    fn wrap(&self) -> SuperSet;
+    fn wrap(&self) -> _SuperSet;
 }
 impl Super for Set {
-    fn wrap(&self) -> SuperSet {
-        SuperSet::Set(self)
+    fn wrap(&self) -> _SuperSet {
+        _SuperSet::Set(self)
     }
 }
 impl Super for FSet {
-    fn wrap(&self) -> SuperSet {
-        SuperSet::FSet(self)
+    fn wrap(&self) -> _SuperSet {
+        _SuperSet::FSet(self)
     }
 }
 #[derive(Copy, Clone)]
@@ -1112,7 +1121,7 @@ impl FSet {
     }
 }
 #[derive(Clone)]
-enum SuperSet<'s> {
+enum _SuperSet<'s> {
     Set(&'s Set),
     FSet(&'s FSet)
 }
@@ -1139,19 +1148,19 @@ impl Display for FSet {
 
 // ----- CONTOURS -----
 #[derive(Clone)]
-pub struct Contour2D {
-    pub f_t: ParametricCurve2D,
+pub struct _Contour2D {
+    pub f_t: _ParametricCurve2D,
     pub lim: Set
 }
 #[derive(Clone)]
-pub struct Contour3D {
-    pub f_t: ParametricCurve3D,
+pub struct _Contour3D {
+    pub f_t: _ParametricCurve3D,
     pub lim: Set
 }
 #[derive(Clone)]
 pub enum Contour {
-    TwoD(Contour2D),
-    ThreeD(Contour3D)
+    TwoD(_Contour2D),
+    ThreeD(_Contour3D)
 }
 impl Contour {
     pub fn ddt(&self, t:f64) -> Vector {
@@ -1176,14 +1185,14 @@ impl Contour {
         let g = self.clone();
         match self {
             Contour::TwoD(c) => {
-                let f = Function::OneD(Function1D {
+                let f = Function::OneD(_Function1D {
                     f: Box::new(move |t:f64| !g.ddt(t)),
                     expression: String::from(""),
                 });
                 integral_1d(&f, &c.lim, IntegrationMethod::GaussLegendre)
             },
             Contour::ThreeD(c) => {
-                let f = Function::OneD(Function1D {
+                let f = Function::OneD(_Function1D {
                     f: Box::new(move |t:f64| !g.ddt(t)),
                     expression: String::from(""),
                 });
@@ -1207,13 +1216,13 @@ impl Display for Contour {
 #[macro_export]
 macro_rules! contour {
     ($t:ident, $f1:expr, $f2:expr, $t0:expr, $t1:expr) => {
-        Contour::TwoD(Contour2D {
-            f_t: ParametricCurve2D {
-                f1: Function::OneD(Function1D {
+        Contour::TwoD(_Contour2D {
+            f_t: _ParametricCurve2D {
+                f1: Function::OneD(_Function1D {
                     f: Box::new(|$t:f64| $f1),
                     expression: String::from(stringify!($f1))
                 }),
-                f2: Function::OneD(Function1D {
+                f2: Function::OneD(_Function1D {
                     f: Box::new(|$t:f64| $f2),
                     expression: String::from(stringify!($f2))
                 })
@@ -1222,17 +1231,17 @@ macro_rules! contour {
         })
     };
     ($t:ident, $f1:expr, $f2:expr, $f3:expr, $t0:expr, $t1:expr) => {
-        Contour::ThreeD(Contour3D {
-            f_t: ParametricCurve3D {
-                f1: Function::OneD(Function1D {
+        Contour::ThreeD(_Contour3D {
+            f_t: _ParametricCurve3D {
+                f1: Function::OneD(_Function1D {
                     f: Box::new(|$t:f64| $f1),
                     expression: String::from(stringify!($f1))
                 }),
-                f2: Function::OneD(Function1D {
+                f2: Function::OneD(_Function1D {
                     f: Box::new(|$t:f64| $f2),
                     expression: String::from(stringify!($f2))
                 }),
-                f3: Function::OneD(Function1D {
+                f3: Function::OneD(_Function1D {
                     f: Box::new(|$t:f64| $f3),
                     expression: String::from(stringify!($f3))
                 })
@@ -1243,13 +1252,13 @@ macro_rules! contour {
     ($curve:expr, $set:expr) => {
         match $curve {
             ParametricCurve::TwoD(c) => {
-                Contour::TwoD(Contour2D {
+                Contour::TwoD(_Contour2D {
                     f_t: c,
                     lim: $set
                 })
             },
             ParametricCurve::ThreeD(c) => {
-                Contour::ThreeD(Contour3D {
+                Contour::ThreeD(_Contour3D {
                     f_t: c,
                     lim: $set
                 })
@@ -1290,46 +1299,97 @@ impl Fn<(f64,)> for Contour {
 pub fn type_of<T>(_: &T) -> &str {
     std::any::type_name::<T>().split("::").collect::<Vec<&str>>().last().unwrap()
 }
-#[macro_export]
-macro_rules! near {
-    ($a:expr, $b:expr) => {
-        $a > $b - 2.*Δ && $a < $b + 2.*Δ
-    };
+
+pub enum __NV {
+    Number(f64),
+    Vector(Vector)
+}
+trait NVWrap {
+    fn nv_wrap(&self) -> __NV;
+}
+impl NVWrap for f64 {
+    fn nv_wrap(&self) -> __NV {
+        __NV::Number(*self)
+    }
+}
+impl NVWrap for Vector {
+    fn nv_wrap(&self) -> __NV {
+        __NV::Vector(*self)
+    }
+}
+// Number near macro
+macro_rules! _near {
     ($a:expr, $b:expr; $e:expr) => {
         $a > $b - $e && $a < $b + $e
     };
+    ($a:expr, $b:expr) => {
+        $a > $b - 2.*Δ && $a < $b + 2.*Δ
+    };
+}
+pub fn near(a:__NV, b:__NV, e:f64) -> bool {
+    match (a, b) {
+        (__NV::Number(a), __NV::Number(b)) => {
+            _near!(a, b; e)
+        },
+        (__NV::Vector(u), __NV::Vector(v)) => {
+            match (u, v) {
+                (Vector::TwoD(u), Vector::TwoD(v)) => {
+                    _near!(u.x, v.x; e) && _near!(u.y, v.y; e)
+                },
+                (Vector::ThreeD(u), Vector::ThreeD(v)) => {
+                    _near!(u.x, v.x; e) && _near!(u.y, v.y; e) && _near!(u.z, v.z; e)
+                },
+                (Vector::TwoD(u), Vector::ThreeD(v)) => {
+                    _near!(u.x, v.x; e) && _near!(u.y, v.y; e) && _near!(0.0, v.z; e)
+                },
+                (Vector::ThreeD(u), Vector::TwoD(v)) => {
+                    _near!(u.x, v.x; e) && _near!(u.y, v.y; e) && _near!(u.z, 0.0; e)
+                },
+            }
+        },
+        (_, _) => panic!("Can only compare numbers with numbers and vectors with vectors")
+    }
 }
 #[macro_export]
-macro_rules! near_v {
+macro_rules! near {
+    ($a:expr, $b:expr) => {
+        near($a.nv_wrap(), $b.nv_wrap(), 2.*Δ)
+    };
+    ($a:expr, $b:expr; $e:expr) => {
+        near($a.nv_wrap(), $b.nv_wrap(), $e)
+    };
+}
+// In-crate near vector efficient macro
+macro_rules! _near_v {
     ($u:expr, $v:expr) => {
         match ($u, $v) {
             (Vector::TwoD(u), Vector::TwoD(v)) => {
-                near!(u.x, v.x) && near!(u.y, v.y)
+                _near!(u.x, v.x) && _near!(u.y, v.y)
             },
             (Vector::ThreeD(u), Vector::ThreeD(v)) => {
-                near!(u.x, v.x) && near!(u.y, v.y) && near!(u.z, v.z)
+                _near!(u.x, v.x) && _near!(u.y, v.y) && _near!(u.z, v.z)
             },
             (Vector::TwoD(u), Vector::ThreeD(v)) => {
-                near!(u.x, v.x) && near!(u.y, v.y) && near!(0.0, v.z)
+                _near!(u.x, v.x) && _near!(u.y, v.y) && _near!(0.0, v.z)
             },
             (Vector::ThreeD(u), Vector::TwoD(v)) => {
-                near!(u.x, v.x) && near!(u.y, v.y) && near!(u.z, 0.0)
+                _near!(u.x, v.x) && _near!(u.y, v.y) && _near!(u.z, 0.0)
             }
         }
     };
     ($u:expr, $v:expr; $e:expr) => {
         match ($u, $v) {
             (Vector::TwoD(u), Vector::TwoD(v)) => {
-                near!(u.x, v.x; $e) && near!(u.y, v.y; $e)
+                _near!(u.x, v.x; $e) && _near!(u.y, v.y; $e)
             },
             (Vector::ThreeD(u), Vector::ThreeD(v)) => {
-                near!(u.x, v.x; $e) && near!(u.y, v.y; $e) && near!(u.z, v.z; $e)
+                _near!(u.x, v.x; $e) && _near!(u.y, v.y; $e) && _near!(u.z, v.z; $e)
             },
             (Vector::TwoD(u), Vector::ThreeD(v)) => {
-                near!(u.x, v.x; $e) && near!(u.y, v.y; $e) && near!(0.0, v.z; $e)
+                _near!(u.x, v.x; $e) && _near!(u.y, v.y; $e) && _near!(0.0, v.z; $e)
             },
             (Vector::ThreeD(u), Vector::TwoD(v)) => {
-                near!(u.x, v.x; $e) && near!(u.y, v.y; $e) && near!(u.z, 0.0; $e)
+                _near!(u.x, v.x; $e) && _near!(u.y, v.y; $e) && _near!(u.z, 0.0; $e)
             },
         }
     };
@@ -1387,11 +1447,11 @@ pub enum MultipleIntegrationMethod {
     MidPoint(f64),
     Simpson(f64)
 }
-fn int_monte_carlo_2d(f:&Function, a:&SuperSet, b:&SuperSet, n:i32) -> f64 {
+fn int_monte_carlo_2d(f:&Function, a:&_SuperSet, b:&_SuperSet, n:i32) -> f64 {
     if let Function::TwoD(_) = f {
         let mut rng = rand::thread_rng();
         match (a, b) {
-            (SuperSet::Set(a), SuperSet::Set(b)) => {
+            (_SuperSet::Set(a), _SuperSet::Set(b)) => {
                 let mut sum = 0.0;
                 for _ in 0..n {
                     let x = rng.gen_range(a.i..a.f);
@@ -1400,7 +1460,7 @@ fn int_monte_carlo_2d(f:&Function, a:&SuperSet, b:&SuperSet, n:i32) -> f64 {
                 }
                 return (sum / n as f64) * (a.f - a.i) * (b.f - b.i);
             },
-            (SuperSet::Set(a), SuperSet::FSet(b)) => {
+            (_SuperSet::Set(a), _SuperSet::FSet(b)) => {
                 if let Function::OneD(_) = b.i {
                     let mut sum = 0.0;
                     let mut var = 0.0;
@@ -1414,7 +1474,7 @@ fn int_monte_carlo_2d(f:&Function, a:&SuperSet, b:&SuperSet, n:i32) -> f64 {
                     return (sum / n as f64)*(a.f - a.i)*(var / n as f64);
                 } else { panic!("Function limits for this double integral need to be 1D") }
             },
-            (SuperSet::FSet(a), SuperSet::Set(b)) => {
+            (_SuperSet::FSet(a), _SuperSet::Set(b)) => {
                 if let Function::OneD(_) = a.i {
                     let mut sum = 0.0;
                     let mut var = 0.0;
@@ -1432,11 +1492,11 @@ fn int_monte_carlo_2d(f:&Function, a:&SuperSet, b:&SuperSet, n:i32) -> f64 {
         }
     } else { panic!("2D Functions require 2 bounds") }
 }
-fn int_monte_carlo_3d(f:&Function, a:&SuperSet, b:&SuperSet, c:&SuperSet, n:i32) -> f64 {
+fn int_monte_carlo_3d(f:&Function, a:&_SuperSet, b:&_SuperSet, c:&_SuperSet, n:i32) -> f64 {
     if let Function::ThreeD(_) = f {
         let mut rng = rand::thread_rng();
         match (a, b, c) {
-            (SuperSet::Set(a), SuperSet::Set(b), SuperSet::Set(c)) => { // any
+            (_SuperSet::Set(a), _SuperSet::Set(b), _SuperSet::Set(c)) => { // any
                 let mut sum = 0.0;
                 for _ in 0..n {
                     let x = rng.gen_range(a.i..a.f);
@@ -1543,11 +1603,11 @@ macro_rules! int_montecarlo {
     ($f:expr, $a:expr, $b:expr, $n:expr) => {int_monte_carlo_2d(&$f, $a, $b, $n)};
     ($f:expr, $a:expr, $b:expr, $c:expr, $n:expr) => {int_monte_carlo_3d(&$f, $a, $b, $c, $n)};
 }
-fn int_midpint_2d(f:&Function, a:&SuperSet, b:&SuperSet, h:f64) -> f64 {
+fn int_midpint_2d(f:&Function, a:&_SuperSet, b:&_SuperSet, h:f64) -> f64 {
     if let Function::TwoD(_) = f {
         let mut sum = 0.0;
         match (a, b) {
-            (SuperSet::Set(a), SuperSet::Set(b)) => {
+            (_SuperSet::Set(a), _SuperSet::Set(b)) => {
                 let mut x = a.i + 0.5*h;
                 let mut y;
                 while x < a.f {
@@ -1560,7 +1620,7 @@ fn int_midpint_2d(f:&Function, a:&SuperSet, b:&SuperSet, h:f64) -> f64 {
                 }
                 sum
             },
-            (SuperSet::Set(a), SuperSet::FSet(b)) => {
+            (_SuperSet::Set(a), _SuperSet::FSet(b)) => {
                 let mut x = a.i + 0.5*h;
                 let mut y;
                 while x < a.f {
@@ -1573,7 +1633,7 @@ fn int_midpint_2d(f:&Function, a:&SuperSet, b:&SuperSet, h:f64) -> f64 {
                 }
                 sum
             },
-            (SuperSet::FSet(a), SuperSet::Set(b)) => {
+            (_SuperSet::FSet(a), _SuperSet::Set(b)) => {
                 let mut y = b.i + 0.5*h;
                 let mut x;
                 while y < b.f {
@@ -1590,11 +1650,11 @@ fn int_midpint_2d(f:&Function, a:&SuperSet, b:&SuperSet, h:f64) -> f64 {
         }
     } else { panic!("2D Functions require 2 bounds") }
 }
-fn int_simpson_2d(f:&Function, a:&SuperSet, b:&SuperSet, h:f64) -> f64 {
+fn int_simpson_2d(f:&Function, a:&_SuperSet, b:&_SuperSet, h:f64) -> f64 {
     if let Function::TwoD(_) = f {
         let mut sum = 0.0;
         match (a, b) {
-            (SuperSet::Set(a), SuperSet::Set(b)) => {
+            (_SuperSet::Set(a), _SuperSet::Set(b)) => {
                 let mut x = a.i;
                 let mut y;
                 while x < a.f {
@@ -1609,7 +1669,7 @@ fn int_simpson_2d(f:&Function, a:&SuperSet, b:&SuperSet, h:f64) -> f64 {
                 }
                 sum
             },
-            (SuperSet::Set(a), SuperSet::FSet(b)) => {
+            (_SuperSet::Set(a), _SuperSet::FSet(b)) => {
                 let mut x = a.i;
                 let mut y = 0.0;
                 while x < a.f {
@@ -1624,7 +1684,7 @@ fn int_simpson_2d(f:&Function, a:&SuperSet, b:&SuperSet, h:f64) -> f64 {
                 }
                 sum
             },
-            (SuperSet::FSet(a), SuperSet::Set(b)) => {
+            (_SuperSet::FSet(a), _SuperSet::Set(b)) => {
                 let mut y = b.i;
                 let mut x = 0.0;
                 while y < b.f {
@@ -1644,21 +1704,21 @@ fn int_simpson_2d(f:&Function, a:&SuperSet, b:&SuperSet, h:f64) -> f64 {
     } else { panic!("2D Functions require 2 bounds") }
 }
 // General Function Wrapper
-enum _G<'s> {
+enum __G<'s> {
     Function(&'s Function),
     VectorFunction(&'s VectorFunction)
 }
-trait Wrap {
-    fn wrap(&self) -> _G;
+trait GWrap {
+    fn wrap(&self) -> __G;
 } // Wrapper for General Function
-impl Wrap for Function {
-    fn wrap(&self) -> _G {
-        _G::Function(self)
+impl GWrap for Function {
+    fn wrap(&self) -> __G {
+        __G::Function(self)
     }
 }
-impl Wrap for VectorFunction {
-    fn wrap(&self) -> _G {
-        _G::VectorFunction(&self)
+impl GWrap for VectorFunction {
+    fn wrap(&self) -> __G {
+        __G::VectorFunction(&self)
     }
 }
 #[macro_export]
@@ -1670,11 +1730,11 @@ macro_rules! line_integral {
         line_integral($g.wrap(), &$c, $m)
     };
 }
-pub fn line_integral(g:_G, c:&Contour, method:IntegrationMethod) -> f64 {
+pub fn line_integral(g: __G, c:&Contour, method:IntegrationMethod) -> f64 {
     let (t0, t1) = c.bounds();
     let mut ft:Box<dyn Fn(f64)->f64> = Box::new(|_:f64| f64::NAN);
     match g {
-        _G::Function(f) => {
+        __G::Function(f) => {
             match (f, c) {
                 (Function::TwoD(_), Contour::TwoD(_)) |
                 (Function::ThreeD(_), Contour::ThreeD(_)) |
@@ -1687,7 +1747,7 @@ pub fn line_integral(g:_G, c:&Contour, method:IntegrationMethod) -> f64 {
                 _ => panic!("No line integral of a 2D function over a 3D contour")
             }
         }
-        _G::VectorFunction(v) => {
+        __G::VectorFunction(v) => {
             let (c1,c0) = (c(t1), c(t0));
             let (half, third) = ((71./67.)*((t1-t0)/2.), (129./131.)*((t1-t0)/3.));
             match v {
@@ -1695,14 +1755,14 @@ pub fn line_integral(g:_G, c:&Contour, method:IntegrationMethod) -> f64 {
                     match c {
                         Contour::TwoD(_) => {
                             if let Some(f) = vf.potential.clone() {
-                                if near_v!(c1, c0; Δ*1e-7) {
+                                if _near_v!(c1, c0; Δ*1e-7) {
                                     return 0.
                                 } else {
                                     return f(c1) - f(c0);
                                 }
                             } else {
                                 let (half, third) = (!curl!(v, c(half).x(), c(half).y()), !curl!(v, c(third).x(), c(third).y()));
-                                if near!(half, 0.0) && near!(third, 0.0) && near_v!(c1, c0){
+                                if near!(half, 0.0) && near!(third, 0.0) && _near_v!(c1, c0){
                                     return 0.
                                 } else {
                                     ft = Box::new(move |t:f64| {
@@ -1716,7 +1776,7 @@ pub fn line_integral(g:_G, c:&Contour, method:IntegrationMethod) -> f64 {
                 }
                 VectorFunction::ThreeD(vf) => {
                     if let Some(f) = vf.potential.clone() {
-                        if near_v!(c1, c0; Δ*1e-7) {
+                        if _near_v!(c1, c0; Δ*1e-7) {
                             return 0.
                         } else {
                             return f(c1) - f(c0);
@@ -1725,7 +1785,7 @@ pub fn line_integral(g:_G, c:&Contour, method:IntegrationMethod) -> f64 {
                     match c {
                         Contour::TwoD(_) => {
                             let (half, third) = (!curl!(v, c(half).x(), c(half).y(), 0.), !curl!(v, c(third).x(), c(third).y(), 0.));
-                            if near!(half, 0.0) && near!(third, 0.0) && near_v!(c1, c0){
+                            if near!(half, 0.0) && near!(third, 0.0) && _near_v!(c1, c0){
                                 return 0.
                             } else {
                                 ft = Box::new(move |t:f64| {
@@ -1735,7 +1795,7 @@ pub fn line_integral(g:_G, c:&Contour, method:IntegrationMethod) -> f64 {
                         }
                         Contour::ThreeD(_) => {
                             let (half, third) = (!curl!(v, c(half).x(), c(half).y(), c(half).z()), !curl!(v, c(third).x(), c(third).y(), c(third).z()));
-                            if near!(half, 0.0) && near!(third, 0.0) && near_v!(c1, c0){
+                            if near!(half, 0.0) && near!(third, 0.0) && _near_v!(c1, c0){
                                 return 0.
                             } else {
                                 ft = Box::new(move |t:f64| {
@@ -1766,7 +1826,7 @@ pub fn integral_1d(f:&Function, set:&Set, method:IntegrationMethod) -> f64 {
 }
 
 // ----- DOUBLE/TRIPLE INTEGRAL -----
-pub fn rn_integral(f:&Function, lim:Vec<SuperSet>, method:MultipleIntegrationMethod) -> f64 {
+pub fn rn_integral(f:&Function, lim:Vec<_SuperSet>, method:MultipleIntegrationMethod) -> f64 {
     match (f, lim.len()) {
         (Function::TwoD(_), 2) => {
             match method {
@@ -1777,7 +1837,7 @@ pub fn rn_integral(f:&Function, lim:Vec<SuperSet>, method:MultipleIntegrationMet
         },
         (Function::ThreeD(_), 3) => {
             match (&lim[0], &lim[1], &lim[2]) {
-                (SuperSet::Set(_), SuperSet::Set(_), SuperSet::Set(_)) => {
+                (_SuperSet::Set(_), _SuperSet::Set(_), _SuperSet::Set(_)) => {
                     match method {
                         MultipleIntegrationMethod::MonteCarlo(n) => int_monte_carlo_3d(f, &lim[0], &lim[1], &lim[2], n),
                         MultipleIntegrationMethod::MidPoint(_) => panic!("No mid point method yet for 3D functions"),
@@ -1791,49 +1851,49 @@ pub fn rn_integral(f:&Function, lim:Vec<SuperSet>, method:MultipleIntegrationMet
     }
 }
 // Integration methods wrapper
-pub enum _M {
+pub enum __M {
     Single(IntegrationMethod),
     Multi(MultipleIntegrationMethod)
 }
 // Integration arguments wrapper
-pub enum _W<'s> {
+pub enum __W<'s> {
     Number(f64),
-    SSet(SuperSet<'s>),
-    Method(_M),
+    SSet(_SuperSet<'s>),
+    Method(__M),
 }
 trait WWrap {
-    fn wwrap(&self) -> _W;
+    fn wwrap(&self) -> __W;
 }
 impl WWrap for f64 {
-    fn wwrap(&self) -> _W {
-        _W::Number(*self)
+    fn wwrap(&self) -> __W {
+        __W::Number(*self)
     }
 }
 impl WWrap for Set {
-    fn wwrap(&self) -> _W {
-        _W::SSet(self.wrap())
+    fn wwrap(&self) -> __W {
+        __W::SSet(self.wrap())
     }
 }
 impl WWrap for FSet {
-    fn wwrap(&self) -> _W {
-        _W::SSet(self.wrap())
+    fn wwrap(&self) -> __W {
+        __W::SSet(self.wrap())
     }
 }
 impl WWrap for IntegrationMethod {
-    fn wwrap(&self) -> _W {
-        _W::Method(_M::Single(self.clone()))
+    fn wwrap(&self) -> __W {
+        __W::Method(__M::Single(self.clone()))
     }
 }
 impl WWrap for MultipleIntegrationMethod {
-    fn wwrap(&self) -> _W {
-        _W::Method(_M::Multi(self.clone()))
+    fn wwrap(&self) -> __W {
+        __W::Method(__M::Multi(self.clone()))
     }
 }
-pub fn categorize_integrals(f:&Function, args:Vec<_W>) -> f64 {
+pub fn categorize_integrals(f:&Function, args:Vec<__W>) -> f64 {
     match args.len() {
         1 => { // 1D set default
             match &args[0] {
-                _W::SSet(s) => if let SuperSet::Set(s) = s {
+                __W::SSet(s) => if let _SuperSet::Set(s) = s {
                     return integral_1d(f, s, IntegrationMethod::GaussLegendre);
                 } else { panic!("E071") }
                 _ => panic!("E072")
@@ -1841,17 +1901,17 @@ pub fn categorize_integrals(f:&Function, args:Vec<_W>) -> f64 {
         },
         2 => { // 1D num default | 1D set specify | 2D sets default
             match (&args[0], &args[1]) {
-                (_W::Number(a), _W::Number(b)) => {
+                (__W::Number(a), __W::Number(b)) => {
                     return integral_1d(f, &set![*a, *b], IntegrationMethod::GaussLegendre);
                 },
-                (_W::SSet(s), _W::Method(m)) => {
-                    if let SuperSet::Set(s) = s {
-                        if let _M::Single(m) = m {
+                (__W::SSet(s), __W::Method(m)) => {
+                    if let _SuperSet::Set(s) = s {
+                        if let __M::Single(m) = m {
                             return integral_1d(f, *s, m.clone());
                         } else { panic!("1D functions can only take methods from the IntegrationMethod enum") }
                     } else { panic!("E074") }
                 },
-                (_W::SSet(x), _W::SSet(y)) => {
+                (__W::SSet(x), __W::SSet(y)) => {
                     return rn_integral(f, vec![x.clone(), y.clone()], MultipleIntegrationMethod::MonteCarlo(400));
                 }
                 (_, _) => panic!("E075")
@@ -1859,12 +1919,12 @@ pub fn categorize_integrals(f:&Function, args:Vec<_W>) -> f64 {
         },
         3 => { // 2D sets specify | 3D sets default
             match (&args[0], &args[1], &args[2]) {
-                (_W::SSet(x), _W::SSet(y), _W::Method(m)) => {
-                    if let _M::Multi(m) = m {
+                (__W::SSet(x), __W::SSet(y), __W::Method(m)) => {
+                    if let __M::Multi(m) = m {
                         return rn_integral(f, vec![x.clone(), y.clone()], m.clone());
                     } else { panic!("2D functions can only take methods from the MultipleIntegrationMethod enum") }
                 },
-                (_W::SSet(x), _W::SSet(y), _W::SSet(z)) => {
+                (__W::SSet(x), __W::SSet(y), __W::SSet(z)) => {
                     return rn_integral(f, vec![x.clone(), y.clone(), z.clone()], MultipleIntegrationMethod::MonteCarlo(400));
                 },
                 (_, _, _) => panic!("E076")
@@ -1872,8 +1932,8 @@ pub fn categorize_integrals(f:&Function, args:Vec<_W>) -> f64 {
         },
         4 => { // 3D sets specify
             match (&args[0], &args[1], &args[2], &args[3]) {
-                (_W::SSet(x), _W::SSet(y), _W::SSet(z), _W::Method(m)) => {
-                    if let _M::Multi(m) = m {
+                (__W::SSet(x), __W::SSet(y), __W::SSet(z), __W::Method(m)) => {
+                    if let __M::Multi(m) = m {
                         return rn_integral(f, vec![x.clone().clone(), y.clone().clone(), z.clone().clone()], m.clone());
                     } else { panic!("3D functions can only take methods from the MultipleIntegrationMethod enum") }
                 },
@@ -1913,15 +1973,15 @@ pub struct ParametricSurface { // All supposed to be Function2D
 #[derive(Clone)]
 pub struct Surface<'s> {
     f:ParametricSurface,
-    u_lim:SuperSet<'s>,
-    v_lim:SuperSet<'s>
+    u_lim: _SuperSet<'s>,
+    v_lim: _SuperSet<'s>
 }
 impl ParametricSurface {
     pub fn ddu(&self, u:f64, v:f64) -> Vector {
-        Vector::ThreeD(Vector3::new(((self.f1)(u + Δ, v) - (self.f1)(u, v))/Δ, ((self.f2)(u + Δ, v) - (self.f2)(u, v))/Δ, ((self.f3)(u + Δ, v) - (self.f3)(u, v))/Δ))
+        Vector::ThreeD(_Vector3::new(((self.f1)(u + Δ, v) - (self.f1)(u, v))/Δ, ((self.f2)(u + Δ, v) - (self.f2)(u, v))/Δ, ((self.f3)(u + Δ, v) - (self.f3)(u, v))/Δ))
     }
     pub fn ddv(&self, u:f64, v:f64) -> Vector {
-        Vector::ThreeD(Vector3::new(((self.f1)(u, v + Δ) - (self.f1)(u, v))/Δ, ((self.f2)(u, v + Δ) - (self.f2)(u, v))/Δ, ((self.f3)(u, v + Δ) - (self.f3)(u, v))/Δ))
+        Vector::ThreeD(_Vector3::new(((self.f1)(u, v + Δ) - (self.f1)(u, v))/Δ, ((self.f2)(u, v + Δ) - (self.f2)(u, v))/Δ, ((self.f3)(u, v + Δ) - (self.f3)(u, v))/Δ))
     }
 }
 impl<'s> Surface<'s> {
@@ -1939,17 +1999,17 @@ impl FnOnce<(f64, f64)> for ParametricSurface {
     type Output = Vector;
 
     extern "rust-call" fn call_once(self, args: (f64, f64)) -> Self::Output {
-        Vector::ThreeD(Vector3::new((self.f1)(args.0, args.1), (self.f2)(args.0, args.1), (self.f3)(args.0, args.1)))
+        Vector::ThreeD(_Vector3::new((self.f1)(args.0, args.1), (self.f2)(args.0, args.1), (self.f3)(args.0, args.1)))
     }
 }
 impl FnMut<(f64, f64)> for ParametricSurface {
     extern "rust-call" fn call_mut(&mut self, args: (f64, f64)) -> Self::Output {
-        Vector::ThreeD(Vector3::new((self.f1)(args.0, args.1), (self.f2)(args.0, args.1), (self.f3)(args.0, args.1)))
+        Vector::ThreeD(_Vector3::new((self.f1)(args.0, args.1), (self.f2)(args.0, args.1), (self.f3)(args.0, args.1)))
     }
 }
 impl Fn<(f64, f64)> for ParametricSurface {
     extern "rust-call" fn call(&self, args: (f64, f64)) -> Self::Output {
-        Vector::ThreeD(Vector3::new((self.f1)(args.0, args.1), (self.f2)(args.0, args.1), (self.f3)(args.0, args.1)))
+        Vector::ThreeD(_Vector3::new((self.f1)(args.0, args.1), (self.f2)(args.0, args.1), (self.f3)(args.0, args.1)))
     }
 }
 impl<'s> FnOnce<(f64, f64)> for Surface<'s> {
@@ -2022,14 +2082,14 @@ macro_rules! surface {
 }
 
 // ----- SURFACE INTEGRAL -----
-pub fn surface_integral(g:&_G, s:&Surface, m:MultipleIntegrationMethod) -> f64 {
+pub fn surface_integral(g:&__G, s:&Surface, m:MultipleIntegrationMethod) -> f64 {
     let s_clone = s.clone();
-    let (u, v): (SuperSet, SuperSet) = (s_clone.u_lim, s_clone.v_lim);
+    let (u, v): (_SuperSet, _SuperSet) = (s_clone.u_lim, s_clone.v_lim);
     let s = s_clone.f;
     match g {
-        _G::Function(f) => {
+        __G::Function(f) => {
             if let Function::ThreeD(_) = f {
-                let fuv = Function::TwoD(Function2D {
+                let fuv = Function::TwoD(_Function2D {
                     f: Box::new(move |u:f64, v:f64| {
                         !(s.ddu(u, v)%s.ddv(u, v))
                     }),
@@ -2038,10 +2098,10 @@ pub fn surface_integral(g:&_G, s:&Surface, m:MultipleIntegrationMethod) -> f64 {
                 rn_integral(&fuv, vec![u, v], m)
             } else { panic!("No surface integrals for 1D and 2D functions") }
         }
-        _G::VectorFunction(f) => {
+        __G::VectorFunction(f) => {
             let f = f.clone().clone();
             if let VectorFunction::ThreeD(_) = f {
-                let vuv = Function::TwoD(Function2D {
+                let vuv = Function::TwoD(_Function2D {
                     f: Box::new(move |u:f64, v:f64| {
                         f(s(u, v))*(s.ddu(u, v)%s.ddv(u,v))
                     }),
@@ -2174,9 +2234,9 @@ mod tests {
         let v = vector_function!(x, y, z, x, y, z);
         let s:Surface = surface!(u, v, u.sin()*v.cos(), u.sin()*v.sin(), u.cos(), 0, PI/2., 0, 2.*PI);
         let rho = surface!(u, v, u+v, u*v, u.powf(v), set![0, 2.*PI], set![0, 10]);
-        assert!(near_v!(s(PI, PI/2.), vector!(0, 0, -1)));
+        assert!(near!(s(PI, PI/2.), vector!(0, 0, -1)));
 
-        let b:f64 = surface_integral!(v, s, Simpson(0.005));
+        let b:f64 = surface_integral!(v, s, Simpson(0.05));
         println!("a = {}", s.area());
         println!("b = {}", b);
     }

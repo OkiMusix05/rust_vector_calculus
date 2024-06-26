@@ -273,3 +273,6 @@ let _:f64 = surface_integral!(v, s, 100); //v:VectorFunction 3D
 ```
 
 where `s` is a `Surface` . The default number of points for the integral is 200, and it uses the Monte Carlo method, although you can specify another $n$ yourself too.
+
+## Helpers
+The `near!(a,b;e)` macro can be applied to vectors or numbers to determine if they're close enough to each other with an error e. You can also run it like `near!(a,b)`, which whill use an error of $1\times10^{-5}$ by default.
