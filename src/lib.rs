@@ -1,4 +1,6 @@
 #![feature(unboxed_closures, fn_traits)]
+//! # Vector Calculus for Rust
+//! [add description here]
 use std::fmt::{Display, Formatter};
 use dyn_clone::DynClone;
 //use std::cmp::{min, max};
@@ -16,11 +18,13 @@ use rand::Rng;
 const Δ:f64 = 5e-6;
 
 // ----- VECTORS -----
+#[doc(hidden)]
 #[derive(Copy, Clone, Debug)]
 pub struct _Vector2 {
     pub x:f64,
     pub y:f64
 }
+#[doc(hidden)]
 #[derive(Copy, Clone, Debug)]
 pub struct _Vector3 {
     pub x:f64,
@@ -78,30 +82,60 @@ impl Display for _Vector3 {
     }
 }
 #[derive(Copy, Clone, Debug)]
+/// A mathematical vector in R2 or R3.
+/// # Vector
+/// Vectors can be created using the [`vector!`] macro, which depends on the number of
+/// arguments passed for the dimension of the vector, although they all fall into `Vector`.
+/// ### Methods
+/// - Vectors can be multiplied using the `*` operator, which performs the dot product,
+/// or the `%` operator, which always returns a 3D vector with its cross product. \
+/// These operations do not take ownership of the vectors, although if you want to you can clone
+/// them using `v.clone()`.
+/// - For taking the modulus (length) of a vector you can use the [md!] macro or the `!` operator,
+/// which in front of a vector takes its length.
+/// - You can access a coordinate from a vector with the `x`, `y` and `z` methods, like `u.x()`.
+/// - Vectors implement display and look like this: ⟨3.00000, 4.00000⟩, using \langle and \rangle
+/// from unicode for around them
+/// ## Examples
+/// ```
+/// use vector_calculus::*;
+/// let u:Vector = vector!(3, 4);
+/// let v:Vector = vector!(0, 1);
+///
+/// assert_eq!(u%v, vector!(0, 0, 3)); // Cross product
+/// assert_eq!(u*v, 4.); // Dot product
+/// assert_eq!(2.*u, vector!(6, 8)); // Product by scalar
+/// assert_eq!(!u, 5.); // Length of the vector
+/// ```
 pub enum Vector {
     TwoD(_Vector2),
     ThreeD(_Vector3)
 }
 impl Vector {
+    /// Creates a 2d vector
     pub fn new_2d(x:f64, y:f64) -> Self {
         Vector::TwoD(_Vector2 { x, y, })
     }
+    /// Creates a 3d vector
     pub fn new_3d(x:f64, y:f64, z:f64) -> Self {
         Vector::ThreeD(_Vector3 { x, y, z })
     }
+    /// Returns the x coordinate
     pub fn x(&self) -> f64 {
         match self {
             Vector::TwoD(v) => v.x,
             Vector::ThreeD(v) => v.x
         }
     }
+    /// Returns the y coordinate
     pub fn y(&self) -> f64 {
         match self {
             Vector::TwoD(v) => v.y,
             Vector::ThreeD(v) => v.y
         }
     }
-    fn z(&self) -> f64 {
+    /// Returns the z coordinate and 0 for 2D vectors
+    pub fn z(&self) -> f64 {
         match self {
             Vector::TwoD(_) => 0.,
             Vector::ThreeD(v) => v.z
@@ -117,7 +151,7 @@ impl PartialEq for Vector {
         }
     }
 }
-// Dot product for Vector
+/// Dot product for Vector
 impl std::ops::Mul for Vector {
     type Output = f64;
 
@@ -129,7 +163,7 @@ impl std::ops::Mul for Vector {
         }
     }
 }
-// Scalar Product
+/// Multiplication by scalar of a vector
 impl std::ops::Mul<f64> for Vector {
     type Output = Self;
 
@@ -147,6 +181,7 @@ impl std::ops::Mul<f64> for Vector {
         }
     }
 }
+/// Multiplication by scalar of a vector
 impl std::ops::Mul<Vector> for f64 {
     type Output = Vector;
 
@@ -164,6 +199,7 @@ impl std::ops::Mul<Vector> for f64 {
         }
     }
 }
+/// Multiplication by scalar of a vector
 impl std::ops::Mul<i32> for Vector {
     type Output = Self;
 
@@ -182,6 +218,7 @@ impl std::ops::Mul<i32> for Vector {
         }
     }
 }
+/// Multiplication by scalar of a vector
 impl std::ops::Mul<Vector> for i32 {
     type Output = Vector;
 
@@ -199,7 +236,7 @@ impl std::ops::Mul<Vector> for i32 {
         }
     }
 }
-// Cross product for Vector
+/// Cross product for Vector
 impl std::ops::Rem for Vector {
     type Output = Vector;
     fn rem(self, rhs: Self) -> Self::Output {
@@ -219,7 +256,7 @@ impl Display for Vector {
         }
     }
 }
-// Modulus for Vectors
+#[doc(hidden)]
 pub fn modulus(v:&Vector) -> f64 {
     match v {
         Vector::TwoD(v) => v.modulus(),
@@ -234,23 +271,46 @@ impl std::ops::Not for Vector {
         modulus(&self)
     }
 }
+/// Creates a vector
+/// # Vector macro
+/// The vector macro can make a 2D or 3D [Vector] depending on the number of arguments passed.\
+/// To create a macro it can take i32's or f64's but that's just for convenience as they all
+/// turn into f64's inside the vector.
+/// ## Examples
+/// ```
+/// use vector_calculus::*;
+/// use std::f64::consts::PI;
+/// let u:Vector = vector!(0, 1);
+/// let v:Vector = vector!(1, PI, PI/2.);
+/// ```
 #[macro_export]
 macro_rules! vector {
     ($x:expr, $y:expr) => {Vector::new_2d($x as f64, $y as f64)};
     ($x:expr, $y:expr, $z:expr) => {Vector::new_3d($x as f64, $y as f64, $z as f64)};
 }
+/// Takes the length of a vector
+/// # Modulus macro
+/// This macro takes the length of any [Vector], although it is often easier using the `!` operator.
+/// ```
+/// use vector_calculus::*;
+/// let v:Vector = vector!(0, 3, 4);
+/// assert_eq!(md!(v), 5.);
+/// ```
 #[macro_export]
 macro_rules! md {
     ($v:expr) => {modulus(&$v)};
 }
 
 // ----- SCALAR FUNCTIONS -----
+#[doc(hidden)]
 pub trait F1DClone: DynClone + Fn(f64,) -> f64 {
     fn call(&self, x: f64) -> f64;
 }
+#[doc(hidden)]
 pub trait F2DClone: DynClone + Fn(f64, f64) -> f64 {
     fn call(&self, x: f64, y: f64) -> f64;
 }
+#[doc(hidden)]
 pub trait F3DClone: DynClone + Fn(f64, f64, f64) -> f64 {
     fn call(&self, x: f64, y: f64, z:f64) -> f64;
 }
@@ -278,6 +338,7 @@ impl<F> F3DClone for F
 dyn_clone::clone_trait_object!(F1DClone<Output=f64>);
 dyn_clone::clone_trait_object!(F2DClone<Output=f64>);
 dyn_clone::clone_trait_object!(F3DClone<Output=f64>);
+#[doc(hidden)]
 pub struct _Function1D {
     pub f:Box<dyn F1DClone<Output=f64>>,
     pub expression:String
@@ -287,6 +348,7 @@ impl _Function1D {
         (self.f)(x)
     }
 }
+#[doc(hidden)]
 pub struct _Function2D {
     pub f:Box<dyn F2DClone<Output=f64>>,
     pub expression:String
@@ -296,6 +358,7 @@ impl _Function2D {
         (self.f)(x, y)
     }
 }
+#[doc(hidden)]
 pub struct _Function3D {
     pub f:Box<dyn F3DClone<Output=f64>>,
     pub expression:String
@@ -329,12 +392,34 @@ impl Clone for _Function3D {
         }
     }
 }
+/// Functions of one, two and three variables
+/// # Function
+/// Functions can be created using the [`f!`] macro, and you can evaluate them like any rust function with
+/// the corresponding number of arguments, all of them f64's. \
+/// As a bonus, you can also evaluate an n-sized [Vector] in an n-variable function, and it will work as intended. \
+/// They also save their expression as a string, which you can obtain as `f.expression()`.\
+/// You can use the [ddx!], [ddy!] and [ddz!] macros to take its derivative at a specific point, and use
+/// the [integral!] macro to evaluate its integral.\
+/// For taking its limit you can use the [limit!] macro, which returns a number. \
+/// Finally, you can make a [VectorFunction] out of a two or three-dimensional function using
+/// the [grad!] macro, which returns the gradient vector function. \
+/// Functions can also be cloned.
+/// _Note_: You may get a syntax error for using a Function as a function, but it will compile correctly.
+/// ## Examples
+/// ```
+/// use vector_calculus::*;
+/// let f:Function = f!(x, y, x*y); // Two variable function
+/// let g:Function = f!(x, x.powi(2)); // Single variable function
+/// assert_eq!(f(1., 2.), 2.);
+/// assert_eq!(g(4.), 16.0);
+/// ```
 pub enum Function {
     OneD(_Function1D),
     TwoD(_Function2D),
     ThreeD(_Function3D)
 }
 impl Function {
+    /// Returns the expression of a Function as a string
     pub fn expression(&self) -> String {
         match self {
             Function::OneD(f) => f.clone().expression,
@@ -343,6 +428,7 @@ impl Function {
         }
     }
 }
+#[doc(hidden)]
 pub fn ddx_s(f:&Function, args:Vec<f64>) -> f64 {
     match f {
         Function::OneD(f) => {
@@ -356,6 +442,7 @@ pub fn ddx_s(f:&Function, args:Vec<f64>) -> f64 {
         }
     }
 }
+#[doc(hidden)]
 pub fn ddy_s(f:&Function, args:Vec<f64>) -> f64 {
     match f {
         Function::OneD(f) => {
@@ -369,6 +456,7 @@ pub fn ddy_s(f:&Function, args:Vec<f64>) -> f64 {
         }
     }
 }
+#[doc(hidden)]
 pub fn ddz_s(f:&Function, args:Vec<f64>) -> f64 {
     match f {
         Function::OneD(f) => {
@@ -382,17 +470,50 @@ pub fn ddz_s(f:&Function, args:Vec<f64>) -> f64 {
         }
     }
 }
+/// Total derivative for single-variable functions and partial x derivative for two and three-variable ones.
+/// # Partial x
+/// This macro takes a [Function] and n f64's where n is the number of variables in the function,
+/// and returns the derivative with respect to the first variable at that point.
+/// ## Examples
+/// ```
+/// use vector_calculus::*;
+/// let f:Function = f!(x, y, z, x*y.powi(2) + z);
+/// let a:f64 = ddx!(f, 1., 2., 9.);
+/// assert_eq!(a, 3.9999999998485687); // Analytically, it's 4
+/// ```
 #[macro_export]
 macro_rules! ddx {
     ($f:expr, $x:expr) => {ddx_s(&$f, vec![$x as f64])};
     ($f:expr, $x:expr, $y:expr) => {ddx_s(&$f, vec![$x as f64, $y as f64])};
     ($f:expr, $x:expr, $y:expr, $z:expr) => {ddx_s(&$f, vec![$x as f64, $y as f64, $z as f64])};
 }
+/// Partial y derivative for two and three-variable functions.
+/// # Partial y
+/// This macro takes a [Function] and n f64's where n is the number of variables in the function,
+/// and returns the derivative with respect to the second variable at that point.
+/// ## Examples
+/// ```
+/// use vector_calculus::*;
+/// let f:Function = f!(x, y, z, x*y.powi(2) + z);
+/// let b:f64 = ddy!(f, 1., 2., 9.);
+/// assert_eq!(b, 4.000004999937801); // Analytically, it's 4
+/// ```
 #[macro_export]
 macro_rules! ddy {
     ($f:expr, $x:expr, $y:expr) => {ddy_s(&$f, vec![$x as f64, $y as f64])};
     ($f:expr, $x:expr, $y:expr, $z:expr) => {ddy_s(&$f, vec![$x as f64, $y as f64, $z as f64])};
 }
+/// Partial z derivative for three-variable functions.
+/// # Partial z
+/// This macro takes a [Function] and 3 f64's representing a point in the form (x, y, z)
+/// and returns the derivative with respect to the third variable at that point.
+/// ## Examples
+/// ```
+/// use vector_calculus::*;
+/// let f:Function = f!(x, y, z, x*y.powi(2) + z);
+/// let b:f64 = ddz!(f, 1., 2., 9.);
+/// assert_eq!(b, 0.9999999999621422); // Analytically, it's 1
+/// ```
 #[macro_export]
 macro_rules! ddz {
     ($f:expr, $x:expr, $y:expr, $z:expr) => {ddz_s(&$f, vec![$x as f64, $y as f64, $z as f64])};
@@ -406,6 +527,16 @@ impl Clone for Function {
         }
     }
 }
+/// Creates a one, two, or three-variable function
+/// # Function Macro
+/// To create a function you need n identifiers, which mean the variables that the function takes in,
+/// and an expression involving some, all or none of the variables that the function should return.
+/// ## Examples
+/// ```
+/// use vector_calculus::*;
+/// let f:Function = f!(x, y, x.powi(2) + 0.5*y);
+/// let g:Function = f!(u, 9.8*u);
+/// ```
 #[macro_export]
 macro_rules! f {
     ($x:ident, $f:expr) => {
@@ -575,6 +706,7 @@ impl FnMut<(Vector,)> for Function {
 }
 
 // ----- LIMITS -----
+#[doc(hidden)]
 pub fn limit_s(f:&Function, args:Vec<f64>) -> f64 {
     match f {
         Function::OneD(_) => {
@@ -594,26 +726,54 @@ pub fn limit_s(f:&Function, args:Vec<f64>) -> f64 {
         }
     }
 }
+/// Calculus limits for functions
+/// # Limit
+/// The limit macro takes in a [Function] of n variables and n f64's, representing the point to take
+/// the limit at. It also uses the `=>` syntax because it fits here and looks cool.
+/// ## Examples
+/// ```
+/// use vector_calculus::*;
+/// let f:Function = f!(x, (x.powi(2)-25.)/(x-5.)); // (x^2-25)/(x-5)
+/// let a:f64 = limit!(f => 5);
+/// assert_eq!(a, 10.0); // Analytically it's 10
+/// ```
 #[macro_export]
 macro_rules! limit {
+    ($f:expr => $x:expr) => {limit_s(&$f, vec![$x as f64])};
     ($f:expr => $x:expr,$y:expr) => {limit_s(&$f, vec![$x as f64, $y as f64])};
     ($f:expr => $x:expr,$y:expr, $z:expr) => {limit_s(&$f, vec![$x as f64, $y as f64, $z as f64])};
 }
 
 // ----- VECTOR FUNCTIONS -----
 #[derive(Clone)]
+#[doc(hidden)]
 pub struct _VectorFunction2D {
     pub f1:Function,
     pub f2:Function,
     pub potential: Option<Function>,
 }
 #[derive(Clone)]
+#[doc(hidden)]
 pub struct _VectorFunction3D {
     pub f1:Function,
     pub f2:Function,
     pub f3:Function,
     pub potential: Option<Function>,
 }
+/// Vector functions for 2D and 3D spaces
+/// # Vector Function
+/// Vector functions are functions of two or three variables that return two or three-dimensional [Vector]s. \
+/// You can create one using the [vector_function!] macro. \
+/// Vector functions evaluate just like [Function]s and rust functions, and you can even evaluate them on [Vector]s. \
+/// You can take its partial derivatives with the [ddxv!], [ddyv!] and [ddzv!] macros, adding the 'v' at the end
+/// to signal that it is the partial of a vector function, and that it returns a [Vector] as such. \
+/// Furthermore, you can use the [curl!] and [div!] macro to evaluate its rotational and divergence at a point. \
+/// ## Examples
+/// ```
+/// use vector_calculus::*;
+/// let v:VectorFunction = vector_function!(x, y, -y, x);
+/// assert_eq!(v(0., 1.), vector!(-1, 0)); // v(0, 1) = (-1, 0)
+/// ```
 #[derive(Clone)]
 pub enum VectorFunction {
     TwoD(_VectorFunction2D),
@@ -653,6 +813,15 @@ impl Display for VectorFunction {
         }
     }
 }
+/// Creates vector functions
+/// # Vector Function macro
+/// This macro takes in two or three identifiers (the variable names) and two or three expressions that may use
+/// those variables, and outputs a [VectorFunction].
+/// ## Examples
+/// ```
+/// use vector_calculus::*;
+/// let F:VectorFunction = vector_function!(x, y, z, y.exp(), x + z, x*y*z);
+/// ```
 #[macro_export]
 macro_rules! vector_function {
     ($x:ident, $y:ident, $f1:expr, $f2:expr) => {
@@ -795,6 +964,7 @@ impl FnMut<(Vector,)> for VectorFunction {
     }
 }
 // Partial Derivatives
+#[doc(hidden)]
 pub fn ddx_v(v:&VectorFunction, args:Vec<f64>) -> Vector {
     match v {
         VectorFunction::TwoD(v) => {
@@ -805,6 +975,7 @@ pub fn ddx_v(v:&VectorFunction, args:Vec<f64>) -> Vector {
         }
     }
 }
+#[doc(hidden)]
 pub fn ddy_v(v:&VectorFunction, args:Vec<f64>) -> Vector {
     match v {
         VectorFunction::TwoD(v) => {
@@ -815,31 +986,66 @@ pub fn ddy_v(v:&VectorFunction, args:Vec<f64>) -> Vector {
         }
     }
 }
+#[doc(hidden)]
 pub fn ddz_v(v:&VectorFunction, args:Vec<f64>) -> Vector {
     match v {
         VectorFunction::TwoD(_) => {
             panic!("Can't take partial with respect to z of a 2D vector function")
         },
         VectorFunction::ThreeD(v) => {
-            Vector::TwoD(_Vector2::new(((v.f1)(args[0], args[1], args[2] + Δ)-(v.f1)(args[0], args[1], args[2]))/Δ, ((v.f2)(args[0], args[1], args[2] + Δ)-(v.f2)(args[0], args[1], args[2]))/Δ))
+            Vector::ThreeD(_Vector3::new(((v.f1)(args[0], args[1], args[2] + Δ)-(v.f1)(args[0], args[1], args[2]))/Δ, ((v.f2)(args[0], args[1], args[2] + Δ)-(v.f2)(args[0], args[1], args[2]))/Δ, ((v.f3)(args[0], args[1], args[2] + Δ)-(v.f3)(args[0], args[1], args[2]))/Δ))
         }
     }
 }
+/// Partial x for a vector function
+/// # Vector Partial x
+/// This macro takes a [VectorFunction] and n f64's representing a point
+/// and returns the derivative with respect to the first variable at that point.
+/// ## Examples
+/// ```
+/// use vector_calculus::*;
+/// let F:VectorFunction = vector_function!(x, y, -2.*y, x);
+/// let v:Vector = ddxv!(F, 2, 1.);
+/// assert_eq!(v, vector!(0, 0.9999999999621422)); // Analytically, it's (0, 1)
+/// ```
 #[macro_export]
 macro_rules! ddxv {
     ($f:expr, $x:expr, $y:expr) => {ddx_v(&$f, vec![$x as f64, $y as f64])};
     ($f:expr, $x:expr, $y:expr, $z:expr) => {ddx_v(&$f, vec![$x as f64, $y as f64, $z as f64])};
 }
+/// Partial y for a vector function
+/// # Vector Partial y
+/// This macro takes a [VectorFunction] and n f64's representing a point
+/// and returns the derivative with respect to the second variable at that point.
+/// ## Examples
+/// ```
+/// use vector_calculus::*;
+/// let F:VectorFunction = vector_function!(x, y, -2.*y, x);
+/// let v:Vector = ddyv!(F, 2, 1.);
+/// assert_eq!(v, vector!(-2.0000000000131024, 0)); // Analytically, it's (-2, 0)
+/// ```
 #[macro_export]
 macro_rules! ddyv {
     ($f:expr, $x:expr, $y:expr) => {ddy_v(&$f, vec![$x as f64, $y as f64])};
     ($f:expr, $x:expr, $y:expr, $z:expr) => {ddy_v(&$f, vec![$x as f64, $y as f64, $z as f64])};
 }
+/// Partial z for a vector function
+/// # Vector Partial z
+/// This macro takes a [VectorFunction] and n f64's representing a point
+/// and returns the derivative with respect to the third variable at that point.
+/// ## Examples
+/// ```
+/// use vector_calculus::*;
+/// let F:VectorFunction = vector_function!(x, y, z, x, y, z.powi(2));
+/// let v:Vector = ddzv!(F, 2, 1, 2);
+/// assert_eq!(v, vector!(0, 0, 4.000004999760165)); // Analytically, it's (0, 0, 4)
+/// ```
 #[macro_export]
 macro_rules! ddzv {
     ($f:expr, $x:expr, $y:expr, $z:expr) => {ddz_v(&$f, vec![$x as f64, $y as f64, $z as f64])};
 }
 // Curl
+#[doc(hidden)]
 pub fn curl(v:&VectorFunction, args:Vec<f64>) -> Vector {
     match v {
         VectorFunction::TwoD(_) => {
@@ -852,6 +1058,17 @@ pub fn curl(v:&VectorFunction, args:Vec<f64>) -> Vector {
         },
     }
 }
+/// Curl of a vector function at a point
+/// # Curl
+/// The curl macro takes in a [VectorFunction] and n f64's representing the point to evaluate, and
+/// returns a vector with the result of applying the rotational operator to it.
+/// ## Examples
+/// ```
+/// use vector_calculus::*;
+/// let f = vector_function!(x, y, -y, x);
+/// let c:Vector = curl!(f, 2, 3);
+/// assert_eq!(c, vector!(0, 0, 1.9999999999242843)) // Analytically its (0, 0, 2)
+/// ```
 #[macro_export]
 macro_rules! curl {
     ($v:expr, $x:expr, $y:expr) => {
@@ -862,6 +1079,7 @@ macro_rules! curl {
     };
 }
 // Div
+#[doc(hidden)]
 pub fn div(v:&VectorFunction, args:Vec<f64>) -> f64 {
     match v {
         VectorFunction::TwoD(_) => {
@@ -874,6 +1092,17 @@ pub fn div(v:&VectorFunction, args:Vec<f64>) -> f64 {
         }
     }
 }
+/// Divergence of a function at a point
+/// # Divergence
+/// The divergence macro takes a [VectorFunction] and n f64's representing the point to evaluate,
+/// and returns a f64 as the result of applying the divergence operator to the function at that point.
+/// ## Examples
+/// ```
+/// use vector_calculus::*;
+/// let f = vector_function!(x, y, 2.*x, 2.*y);
+/// let a:f64 = div!(f, 0, 0);
+/// assert_eq!(a, 4.);
+/// ```
 #[macro_export]
 macro_rules! div {
     ($v:expr, $x:expr, $y:expr) => {
@@ -885,6 +1114,7 @@ macro_rules! div {
 }
 
 // ----- GRADIENT -----
+#[doc(hidden)]
 pub fn grad(f:&Function) -> VectorFunction {
     match f {
         Function::OneD(_) => panic!("Gradient vector not defined for 1D function"),
@@ -893,7 +1123,7 @@ pub fn grad(f:&Function) -> VectorFunction {
             let f2 = f.clone();
             VectorFunction::TwoD(_VectorFunction2D {
                 f1: Function::TwoD(_Function2D {
-                    f: Box::new(move |x:f64, y:f64| ddy_s(&f1, vec![x, y])),
+                    f: Box::new(move |x:f64, y:f64| ddx_s(&f1, vec![x, y])),
                     expression: format!("ddx({})", f.expression())
                 }),
                 f2: Function::TwoD(_Function2D {
@@ -925,6 +1155,19 @@ pub fn grad(f:&Function) -> VectorFunction {
         }
     }
 }
+/// Gradient for functions
+/// # Gradient
+/// This macro only takes a [Function] as an argument, and returns a [VectorFunction], whose components
+/// are the partial derivatives of the original function. \
+/// Vector functions created like this preserve its potential function and you can access it as an expression
+/// with `f.potential_expression()`.
+/// ## Examples
+/// ```
+/// use vector_calculus::*;
+/// let f = f!(x, y, x*y);
+/// let v = grad!(f);
+/// assert_eq!(v(4., 5.), vector!(5.000000000165983, 3.9999999998485687)); // Analytically, v(4, 4)=(5, 4)
+/// ```
 #[macro_export]
 macro_rules! grad {
     ($f:expr) => {
@@ -1963,11 +2206,8 @@ macro_rules! integral {
 #[derive(Clone)]
 pub struct ParametricSurface { // All supposed to be Function2D
     f1:Function,
-    expression_f1:String,
     f2:Function,
-    expression_f2:String,
     f3:Function,
-    expression_f3:String
 }
 
 #[derive(Clone)]
@@ -2048,11 +2288,8 @@ macro_rules! surface {
         Surface {
             f: ParametricSurface {
                 f1: f!($u, $v, $f1),
-                expression_f1: String::from(stringify!($f1)),
                 f2: f!($u, $v, $f2),
-                expression_f2: String::from(stringify!($f2)),
                 f3: f!($u, $v, $f3),
-                expression_f3: String::from(stringify!($f3)),
             },
             u_lim: set![$ui, $uf].wrap(),
             v_lim: set![$vi, $vf].wrap()
@@ -2062,11 +2299,8 @@ macro_rules! surface {
         Surface {
             f: ParametricSurface {
                 f1: f!($u, $v, $f1),
-                expression_f1: String::from(stringify!($f1)),
                 f2: f!($u, $v, $f2),
-                expression_f2: String::from(stringify!($f2)),
                 f3: f!($u, $v, $f3),
-                expression_f3: String::from(stringify!($f3)),
             },
             u_lim: $ul.wrap(),
             v_lim: $vl.wrap()
@@ -2128,18 +2362,30 @@ macro_rules! setup {
 }
 
 // ----- HELPERS ------
+/// sin function
+/// # Sine
+/// Just syntax sugar because I think it's easier to write `sin!(x)` than `x.sin()` and it leads to less confusion.
 #[macro_export]
 macro_rules! sin {
     ($x:expr) => {$x.sin()};
 }
+/// cos function
+/// # Cosine
+/// Just syntax sugar because I think it's easier to write `cos!(x)` than `x.cos()` and it leads to less confusion.
 #[macro_export]
 macro_rules! cos {
     ($x:expr) => {$x.cos()};
 }
+/// tan function
+/// # Tangent
+/// Just syntax sugar because I think it's easier to write `tan!(x)` than `x.tan()` and it leads to less confusion.
 #[macro_export]
 macro_rules! tan {
     ($x:expr) => {$x.tan()};
 }
+/// ln function
+/// # Natural log
+/// Just syntax sugar because I think it's easier to write `ln!(x)` than `x.ln()` and it leads to less confusion.
 #[macro_export]
 macro_rules! ln {
     ($x:expr) => {$x.ln()};
@@ -2157,6 +2403,7 @@ mod tests {
         let v = vector!(4, 3);
         let w = u%v;
         println!("|2*(u%v)| = {}, {}", md!(2*w), u.z());
+        println!("{}", u);
         //assert_eq!(vector!(0.0, 0.0), vector!(-0.0, -0.0));
         assert_eq!(2.*u*v, 48.);
     }

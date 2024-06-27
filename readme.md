@@ -1,7 +1,18 @@
 # Vector Calculus Crate
+
 A Rust crate to simplify working with vector calculus, designed to be
 as easy to write and work with as possible, to mimic a high-level feel
 but low-level Rust features.
+
+# Usage
+To use the library, the project will have to be using the nightly toolchain,
+for which you can copy the [rust-toolchain.toml](rust-toolchain.toml) file.
+
+A guide with all the features included is also available in the
+[guide.md](guide.md) file. Here you can learn about all of the macros provided.
+If you don't want to keep coming to github, there's also the
+[vector calculus crate](http://periodic-move-478.notion.site) website, which is the same.
+
 ## Version Control
 - v0.0 - Initial commit: Vectors and Scalar Functions
 - v0.01 - Added Vector Functions, as well as curl, div, gradient, etc.
@@ -27,7 +38,4 @@ to contours.
 added multiple double integration methods, and a setup macro for importing the 
 IntegrationMethod and MultipleIntegrationMethod's variants, as well as pi and e.
 - v0.051 - Some restructuring, generalized the near! macro.
-# Usage
-To use the library, the project will have to be using the nightly toolchain,
-for which you can copy the "rust-toolchain.toml" file.\
-A step by step guide is available in the "guide.md" file.
+- v0.052 - Fixed some things, created some documentation for docs.rs
