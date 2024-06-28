@@ -15,7 +15,15 @@ use rand::Rng;
 // ----- GLOBAL CONSTANTS -----
 /// # General Error
 /// The error Δ = 5*10^-6
-const Δ:f64 = 5e-6;
+pub const Δ:f64 = 5e-6;
+/// # Universal gravitational constant
+/// The constant G has a value of 6.6743*10^-11
+/// \[G\] = m^3/kg*s^2
+pub const G:f64 = 6.6743e-11;
+/// # Speed of light in a vacuum
+/// The constant c has a value of 299,792,458
+/// \[c\] = m/s
+pub const C:f64 = 299_792_458.0;
 
 // ----- VECTORS -----
 #[doc(hidden)]
@@ -1092,7 +1100,7 @@ pub fn div(v:&VectorFunction, args:Vec<f64>) -> f64 {
         }
     }
 }
-/// Divergence of a function at a point
+/// Divergence of a vector function at a point
 /// # Divergence
 /// The divergence macro takes a [VectorFunction] and n f64's representing the point to evaluate,
 /// and returns a f64 as the result of applying the divergence operator to the function at that point.
@@ -1176,6 +1184,7 @@ macro_rules! grad {
 }
 
 // ----- PARAMETRIC CURVES -----
+#[doc(hidden)]
 #[derive(Clone)]
 pub struct _ParametricCurve2D { // Supposed to be 1D
     pub f1:Function,
@@ -1203,6 +1212,7 @@ impl Fn<(f64,)> for _ParametricCurve2D {
         Vector::TwoD(_Vector2::new((self.f1)(args.0), (self.f2)(args.0)))
     }
 }
+#[doc(hidden)]
 #[derive(Clone)]
 pub struct _ParametricCurve3D {
     pub f1:Function,
@@ -1231,6 +1241,19 @@ impl Fn<(f64,)> for _ParametricCurve3D {
         Vector::ThreeD(_Vector3::new((self.f1)(args.0), (self.f2)(args.0), (self.f3)(args.0)))
     }
 }
+/// Parametric curves in R^2 and R^3
+/// # Parametric Curve
+/// Parametric curves are vector functions of one variable, typically representing curves in space. \
+/// To create one there is the [curve!] macro, although most of the time these will be used in a [Contour],
+/// and so they will be created in one as such.\
+/// These can be evaluated like single-variable functions, they can be cloned, and you obtain the
+/// derivative vector through the `c.ddt(t0)` method or the [ddt!] macro.
+/// ## Examples
+/// ```
+/// use vector_calculus::*;
+/// let sigma:ParametricCurve = curve!(t, t.powi(2), 3.*t); // σ(t) = (t^2, 3t)
+/// assert_eq!(sigma(2.), vector!(4, 6)); // σ(2) = (4, 6)
+/// ```
 #[derive(Clone)]
 pub enum ParametricCurve {
     TwoD(_ParametricCurve2D),
@@ -1256,6 +1279,15 @@ impl Display for ParametricCurve {
         }
     }
 }
+/// Creates parametric curves
+/// # Curve macro
+/// This macro takes in a single variable identifier and n expressions involving that variable, where n
+/// is either 2 or 3 depending on the dimension of the curve, and returns a [ParametricCurve]
+/// ## Examples
+/// ```
+/// use vector_calculus::*;
+/// let rho:ParametricCurve = curve!(tau, 3.*tau, 5., tau.sqrt()); // curve in R^3
+/// ```
 #[macro_export]
 macro_rules! curve {
     ($t:ident, $f1:expr, $f2:expr) => {
@@ -1313,12 +1345,24 @@ impl Fn<(f64,)> for ParametricCurve {
         }
     }
 }
+/// Derivative for parametric curves
+/// # Derivative macro
+/// This macro is another option to the `sigma.ddt(f64)` method, and takes in a [ParametricCurve]
+/// and a f64, and returns the derivative vector on t0=f64.
+/// ## Examples
+/// ```
+/// use vector_calculus::*;
+/// let sigma:ParametricCurve = curve!(t, t.powi(2), 3.*t); // σ(t) = (t^2, 3t)
+/// assert_eq!(sigma.ddt(1.), vector!(2.000005000013516, 3.000000000064062)) // σ'(1) = (2, 3);
+/// ```
+#[macro_export]
 macro_rules! ddt {
     ($f:expr, $t:expr) => {$f.ddt($t as f64)};
 }
 
 // ----- SETS -----
-trait Super {
+#[doc(hidden)]
+pub trait Super {
     fn wrap(&self) -> _SuperSet;
 }
 impl Super for Set {
@@ -1331,6 +1375,19 @@ impl Super for FSet {
         _SuperSet::FSet(self)
     }
 }
+/// Single variable domains
+/// # Set
+/// A set in this crate is the domain where a variable lives. It's commonly used next to a [ParametricCurve]
+/// in a [Contour] to delimit the bounds of its independent variable. Like t ∈ \[a, b\]. \
+/// You can access the start and end of a set as `.i` and `.f` \
+/// There's also the `.linspace(n)` method that returns a vector with n elements of the set split n times. \
+/// They are created with the [set!] macro, and do implement display.
+/// ## Examples
+/// ```
+/// use vector_calculus::*;
+/// let t_space:Set = set![0, 1];
+/// assert_eq!(t_space.i, 0.0);
+/// ```
 #[derive(Copy, Clone)]
 pub struct Set {
     pub i:f64,
@@ -1346,13 +1403,25 @@ impl Set {
         space
     }
 }
+/// Function sets for variable domains
+/// # Function Set
+/// An FSet is like a [Set] that instead of constant f64 limits has single-variable functions as its bounds. \
+/// It's commonly used for the bounds of one variable in a [ParametricSurface]. \
+/// These are created with the [fset!] macro. \
+/// _Note:_ These can't be evaluated like functions, and are meant just for parametric surfaces, but they do
+/// implement display, so when printed they will print the expressions as strings.
+/// ## Examples
+/// ```
+/// use vector_calculus::*;
+/// let y_bounds:FSet = fset!(f!(x, 0.), f!(x, x.powi(2)));
+/// ```
 #[derive(Clone)]
 pub struct FSet {
     pub i:Function,
     pub f:Function,
 }
 impl FSet {
-    fn new(i:Function, f:Function) -> Self {
+    pub fn new(i:Function, f:Function) -> Self {
         match (&i, &f) {
             (Function::OneD(_), Function::OneD(_)) |
             (Function::TwoD(_), Function::TwoD(_)) => {
@@ -1363,11 +1432,20 @@ impl FSet {
         }
     }
 }
+#[doc(hidden)]
 #[derive(Clone)]
-enum _SuperSet<'s> {
+pub enum _SuperSet<'s> {
     Set(&'s Set),
     FSet(&'s FSet)
 }
+/// Creates a set
+/// # Set macro
+/// This macro is used to create a [Set], and it takes two f64's as arguments representing its bounds
+/// ## Examples
+/// ```
+/// use vector_calculus::*;
+/// let t_space:Set = set![0, std::f64::consts::PI];
+/// ```
 #[macro_export]
 macro_rules! set {
     ($i:expr, $f:expr) => {Set {
@@ -1375,6 +1453,16 @@ macro_rules! set {
         f: $f as f64
     }};
 }
+/// Creates a function set
+/// # Function set macro
+/// This macro is used to create an [FSet], and it takes two [Function]s as arguments, which can be already
+/// created, or you can use the [f!] macro to create them on the spot, but they both need to be single-variable.
+/// ## Examples
+/// ```
+/// use vector_calculus::*;
+/// let y_bounds:FSet = fset!(f!(x, 0.), f!(x, x.powi(2)));
+/// ```
+#[macro_export]
 macro_rules! fset {
     ($fi:expr, $ff:expr) => {FSet::new($fi, $ff)};
 }
@@ -1390,16 +1478,31 @@ impl Display for FSet {
 }
 
 // ----- CONTOURS -----
+#[doc(hidden)]
 #[derive(Clone)]
 pub struct _Contour2D {
     pub f_t: _ParametricCurve2D,
     pub lim: Set
 }
+#[doc(hidden)]
 #[derive(Clone)]
 pub struct _Contour3D {
     pub f_t: _ParametricCurve3D,
     pub lim: Set
 }
+/// Contours for integration
+/// # Contour
+/// Contours are composed of a [ParametricCurve] and a [Set], which represent the curve and the bounds,
+/// due to these being intended for a [line_integral!]. \
+/// Contours also have a `.ddt(f64)` method (and the [ddt!] macro), a `.linspace()` and a `.bounds()` method, which returns a tuple
+/// with two f64 as the bounds. \
+/// These can be created with the [contour!] macro, and can also be evaluated as functions.
+/// ## Examples
+/// ```
+/// use vector_calculus::*;
+/// let c:Contour = contour!(t, 2.*t, t.powi(2), 0, 10);
+/// assert_eq!(c(3.), vector!(6, 9));
+/// ```
 #[derive(Clone)]
 pub enum Contour {
     TwoD(_Contour2D),
@@ -1456,6 +1559,17 @@ impl Display for Contour {
         }
     }
 }
+/// Creates a contour
+/// # Contour macro
+/// This macro is used to create a [Contour], and can be initialized with a [ParametricCurve] and a [Set],
+/// or an identifier coupled with n expressions and two f64's for the bounds.
+/// ## Examples
+/// ```
+/// use vector_calculus::*;
+/// let p:ParametricCurve = curve!(t, 2.*t, t.powi(2)); // curve
+/// let c:Contour = contour!(p, set![0, 5]); // curve + set
+/// let rho:Contour = contour!(t, 3.*t, 0., t.sqrt(), 0, 2); // from scratch
+/// ```
 #[macro_export]
 macro_rules! contour {
     ($t:ident, $f1:expr, $f2:expr, $t0:expr, $t1:expr) => {
@@ -1539,15 +1653,25 @@ impl Fn<(f64,)> for Contour {
 // The ddt macro also works for Contours
 
 // ----- LINE INTEGRAL -----
+/// Type of any variable
+/// # Type of function
+/// Returns the type of any variable passed as reference, as a string
+/// ## Examples
+/// ```
+/// use vector_calculus::*;
+/// let u:Vector = vector!(0, 1, 0);
+/// assert_eq!(type_of(&u), "Vector".to_string());
+/// ```
 pub fn type_of<T>(_: &T) -> &str {
     std::any::type_name::<T>().split("::").collect::<Vec<&str>>().last().unwrap()
 }
-
+#[doc(hidden)]
 pub enum __NV {
     Number(f64),
     Vector(Vector)
 }
-trait NVWrap {
+#[doc(hidden)]
+pub trait NVWrap {
     fn nv_wrap(&self) -> __NV;
 }
 impl NVWrap for f64 {
@@ -1593,6 +1717,17 @@ pub fn near(a:__NV, b:__NV, e:f64) -> bool {
         (_, _) => panic!("Can only compare numbers with numbers and vectors with vectors")
     }
 }
+/// Checks if two numbers or vectors are close enough
+/// # Near macro
+/// The near macro takes two f64's or two [Vector]s -- optionally also an error threshold f64, -- and
+/// returns `ture` or `false` depending on if they are close enough. The default error threshold is 2*[Δ]=10^-5.
+/// ## Examples
+/// ```
+/// use vector_calculus::*;
+/// let f:Contour = contour!(t, 2.*t, t.powi(2), 0, 1);
+/// let v:Vector = vector!(2, 2);
+/// assert!(near!(f.ddt(1.), v)); // f'(1) = (2, 2)
+/// ```
 #[macro_export]
 macro_rules! near {
     ($a:expr, $b:expr) => {
@@ -1638,6 +1773,15 @@ macro_rules! _near_v {
     };
 }
 // Single Integration
+/// Alternate methods for single integration
+/// # Integration Method
+/// This enum is used in the [integral!] macro, and contains three variants:
+/// - GaussLegendre #default
+/// - Riemann(i32)
+/// - Simpson13(i32)
+///
+/// The Riemann and Simpson 1/3 methods require a number of partitions n, whilst Gauss-Legendre
+/// is done with 5 points.
 #[derive(Clone)]
 pub enum IntegrationMethod {
     GaussLegendre,
@@ -1684,6 +1828,16 @@ macro_rules! int_simpson13 {
     }};
 }
 // Multiple integration
+/// Alternate methods for double/triple integration
+/// # Multiple Integration Method
+/// This enum is used in the [integral!] macro, and contains three variants:
+/// - MonteCarlo(i32) #default
+/// - MidPoint(f64)
+/// - Simpson(f64)
+///
+/// MonteCarlo requires a number of points n, but the default is 400. \
+/// As of the mid-point rule and the Simpson method, these require a δ; recommended is δ=0.05. \
+/// _Note:_ midpoint and simpson are only implemented for double integrals as of the current version.
 #[derive(Clone)]
 pub enum MultipleIntegrationMethod {
     MonteCarlo(i32),
@@ -1947,11 +2101,13 @@ fn int_simpson_2d(f:&Function, a:&_SuperSet, b:&_SuperSet, h:f64) -> f64 {
     } else { panic!("2D Functions require 2 bounds") }
 }
 // General Function Wrapper
-enum __G<'s> {
+#[doc(hidden)]
+pub enum __G<'s> {
     Function(&'s Function),
     VectorFunction(&'s VectorFunction)
 }
-trait GWrap {
+#[doc(hidden)]
+pub trait GWrap {
     fn wrap(&self) -> __G;
 } // Wrapper for General Function
 impl GWrap for Function {
@@ -1964,6 +2120,22 @@ impl GWrap for VectorFunction {
         __G::VectorFunction(&self)
     }
 }
+/// Line integrals for scalar and vector functions
+/// # Line Integral macro
+/// Line integrals can take a [Function] or [VectorFunction], along with a [Contour] and optionally
+/// an [IntegrationMethod].
+/// ## Examples
+/// ```
+/// use vector_calculus::*;
+/// setup!();
+/// let f:Function = f!(x, y, x + y);
+/// let F:VectorFunction = vector_function!(x, y, x*y, y.powi(2));
+/// let c:Contour = contour!(t, cos!(t), sin!(t), 0, 2.*PI);
+/// // Scalar line integral
+/// assert_eq!(line_integral!(f, c), -0.00019354285449835196); // Analytically its 0
+/// // Vector line integral              v 3e-12 = 0
+/// assert_eq!(line_integral!(F, c), -3.877467549578482e-12); // Analytically its 0
+/// ```
 #[macro_export]
 macro_rules! line_integral {
     ($g:expr, $c:expr) => {
@@ -1973,6 +2145,7 @@ macro_rules! line_integral {
         line_integral($g.wrap(), &$c, $m)
     };
 }
+#[doc(hidden)]
 pub fn line_integral(g: __G, c:&Contour, method:IntegrationMethod) -> f64 {
     let (t0, t1) = c.bounds();
     let mut ft:Box<dyn Fn(f64)->f64> = Box::new(|_:f64| f64::NAN);
@@ -2057,6 +2230,7 @@ pub fn line_integral(g: __G, c:&Contour, method:IntegrationMethod) -> f64 {
         IntegrationMethod::Simpson13(n) => int_simpson13!(ft, t0, t1, n)
     }
 }
+#[doc(hidden)]
 pub fn integral_1d(f:&Function, set:&Set, method:IntegrationMethod) -> f64 {
     match f {
         Function::OneD(_) => match method {
@@ -2069,6 +2243,7 @@ pub fn integral_1d(f:&Function, set:&Set, method:IntegrationMethod) -> f64 {
 }
 
 // ----- DOUBLE/TRIPLE INTEGRAL -----
+#[doc(hidden)]
 pub fn rn_integral(f:&Function, lim:Vec<_SuperSet>, method:MultipleIntegrationMethod) -> f64 {
     match (f, lim.len()) {
         (Function::TwoD(_), 2) => {
@@ -2094,17 +2269,20 @@ pub fn rn_integral(f:&Function, lim:Vec<_SuperSet>, method:MultipleIntegrationMe
     }
 }
 // Integration methods wrapper
+#[doc(hidden)]
 pub enum __M {
     Single(IntegrationMethod),
     Multi(MultipleIntegrationMethod)
 }
 // Integration arguments wrapper
+#[doc(hidden)]
 pub enum __W<'s> {
     Number(f64),
     SSet(_SuperSet<'s>),
     Method(__M),
 }
-trait WWrap {
+#[doc(hidden)]
+pub trait WWrap {
     fn wwrap(&self) -> __W;
 }
 impl WWrap for f64 {
@@ -2132,6 +2310,7 @@ impl WWrap for MultipleIntegrationMethod {
         __W::Method(__M::Multi(self.clone()))
     }
 }
+#[doc(hidden)]
 pub fn categorize_integrals(f:&Function, args:Vec<__W>) -> f64 {
     match args.len() {
         1 => { // 1D set default
@@ -2186,6 +2365,55 @@ pub fn categorize_integrals(f:&Function, args:Vec<__W>) -> f64 {
         _ => panic!("Why you put so many arguments in here, bro?")
     }
 }
+/// Integrates scalar functions of one, two, or three variables
+/// # Integral macro
+/// The integral macro is the most versatile of these, because it has multiple ways to call it:
+/// 1. With a 1d function and a [Set]
+/// 2. With a 1d function and two numbers
+/// 3. With a 1d function and a set, specifying the method from the [IntegrationMethod] enum
+/// 4. With a 2d function and two sets
+/// 5. With a 2d function, two sets and a method from the [MultipleIntegrationMethod] enum
+/// 6. With a 3d function and three sets
+/// 7. With a 3d function, three sets and the MonteCarlo method from the [MultipleIntegrationMethod] enum,
+/// as it is currently the only one supported for triple integrals, but this allows you to specify n: the
+/// number of points.
+///
+/// 2D [Function]s can be integrated with non-constant bounds, where the first set or fset is the x bounds
+/// and the second one is the y bounds. However, only one bound can be an [FSet]. \
+/// 3D Functions, however, can only be integrated with constant bounds as of the current version; the first
+/// set is the x bounds, the second the y bounds and the third the z bounds. \
+/// In this implementation, the order of the sets for the integration limits is the same as the definition
+/// of the variables. Can't be changed. \
+/// This means, that this macro encapsulates, single, double and triple integrals, but not [line_integral]s
+/// nor [surface_integral!]s. \
+/// _Note_: It is customary that when the bounds of a variable are functions, you use the other variable as
+/// identifier in the FSet functions, as observed in the example with `x_bounds` and `y_bounds`. \
+/// ## Examples
+/// ```
+/// use vector_calculus::*;
+/// let f1 = f!(x, x.powi(2));
+/// let f2 = f!(x, y, x*y);
+/// let f3 = f!(x, y, z, x*y + z);
+///
+/// let (a, b): (f64, f64) = (0., 1.);
+/// let bounds = set![0, 1];
+/// let x_bounds = set![0, 1];
+/// let y_bounds = fset![f!(x, 0.), f!(x, x.powi(2))];
+/// let y_bounds_const = set![0, 3];
+/// let z_bounds = set![0, 2];
+///
+/// let method = IntegrationMethod::Simpson13(100);
+/// let multiple_method = MultipleIntegrationMethod::Simpson(0.05);
+/// let multiple_method_3d = MultipleIntegrationMethod::MonteCarlo(2_000);
+///
+/// integral!(f1, bounds); // 1D function
+/// integral!(f1, a, b); // 1D function
+/// integral!(f1, bounds, method); // 1D function
+/// integral!(f2, x_bounds, y_bounds); // 2D function
+/// integral!(f2, x_bounds, y_bounds, multiple_method); // 2D function
+/// integral!(f3, x_bounds, y_bounds, z_bounds); // 3D function
+/// integral!(f3, x_bounds, y_bounds_const, z_bounds, multiple_method_3d); // 3D function
+/// ```
 #[macro_export]
 macro_rules! integral {
     ($f:expr, $s:expr) => { // 1D set default
@@ -2197,24 +2425,55 @@ macro_rules! integral {
     ($f:expr, $x:expr, $y:expr, $mz:expr) => { // 2D sets specify | 3D sets default
         categorize_integrals(&$f, vec![$x.wwrap(), $y.wwrap(), $mz.wwrap()])
     };
-    ($f:expr, $x:expr, $y:expr, $z:expr, $m:expr) => { // 3D - specified
+    ($f:expr, $x:expr, $y:expr, $z:expr, $m:expr) => { // 3D specified
         categorize_integrals(&$f, vec![$x.wwrap(), $y.wwrap(), $z.wwrap(), $m.wwrap()])
     };
 }
 
 // ----- SURFACES -----
+/// Special function of R^2→R^3
+/// # Parametric Surface
+/// Parametric surfaces are part of a [Surface], but you can create one by itself with the [parametric_surface!]
+/// macro. They are composed of three scalar two-dimensional functions, and they behave like 2D functions, except
+/// they return a 3D vector. \
+/// These also implement display, and have a `.ddu(f64,f64)` and `.ddv(f64,f64)` that returns the partial derivative
+/// vectors.
+/// ## Examples
+/// ```
+/// use vector_calculus::*;
+/// let p:ParametricSurface = parametric_surface!(u, v, u.powi(2)*v, u+v, v*u);
+/// println!("p(u,v) = {}", p);
+/// assert_eq!(p(1., 2.), vector!(2, 3, 2));
+/// ```
 #[derive(Clone)]
 pub struct ParametricSurface { // All supposed to be Function2D
-    f1:Function,
-    f2:Function,
-    f3:Function,
+    pub f1:Function,
+    pub f2:Function,
+    pub f3:Function,
 }
-
+impl Display for ParametricSurface {
+    fn fmt(&self, f: &mut Formatter<'_>) -> std::fmt::Result {
+        write!(f, "⟨{}, {}, {}⟩", self.f1.expression(), self.f2.expression(), self.f3.expression())
+    }
+}
+/// Surfaces in R^3
+/// # Surface
+/// Surfaces consist of a [ParametricSurface] and two [Set]s, (one of them can be an [FSet]), that represent
+/// the bounds of the surfaces. \
+/// They are created with the [surface!] macro, and behave just like parametric surfaces, having the same methods
+/// but with one more called `.area()` which takes the double integral of the surface to obtain its area.
+/// ## Examples
+/// ```
+/// use vector_calculus::*;
+/// setup!();
+/// let s:Surface = surface!(u, v, cos!(v)*sin!(u), sin!(v)*sin!(u), cos!(u), 0, PI, 0, 2.*PI); // Sphere
+/// assert_eq!(s(0., 0.), vector!(0, 0, 1)); // Top of the sphere
+/// ```
 #[derive(Clone)]
 pub struct Surface<'s> {
-    f:ParametricSurface,
-    u_lim: _SuperSet<'s>,
-    v_lim: _SuperSet<'s>
+    pub f:ParametricSurface,
+    pub u_lim: _SuperSet<'s>,
+    pub v_lim: _SuperSet<'s>
 }
 impl ParametricSurface {
     pub fn ddu(&self, u:f64, v:f64) -> Vector {
@@ -2274,11 +2533,8 @@ macro_rules! parametric_surface {
     ($u:ident, $v:ident, $f1:expr, $f2:expr, $f3:expr) => {
         ParametricSurface {
                 f1: f!($u, $v, $f1),
-                expression_f1: String::from(stringify!($f1)),
                 f2: f!($u, $v, $f2),
-                expression_f1: String::from(stringify!($f2)),
-                f1: f!($u, $v, $f3),
-                expression_f1: String::from(stringify!($f3)),
+                f3: f!($u, $v, $f3),
             }
     };
 }
