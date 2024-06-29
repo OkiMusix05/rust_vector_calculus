@@ -1,6 +1,7 @@
 [package]
 name = "vector_calculus"
 version = "0.1.0"
+description = "A single easy-to-use library for all vector calculus computations"
 authors = ["oki"]
 edition = "2021"
 license = "MIT"
