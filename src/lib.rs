@@ -15,6 +15,11 @@
 //!
 //! As extras, also take into account [grad!], [curl!], [div!], derivatives like [ddx!] and [ddyv!], and lastly but
 //! not least important: the [setup!] macro.
+//! ## Notes
+//! It is important to note that this project uses the nightly toolchain, so you'll have to add a `rust-toolchain.toml`
+//! file that indicates to use the nightly build. \
+//! Also, due to the experimental nature of Fn implementations, you sometimes might get an error in your IDE when trying
+//! to use structs or enums like [Function] and [ParametricCurve] as functions, but this code does compile without errors.
 //! ## About the crate
 //! This crate was made by a 4th semester physics student to help verify the analytic results obtained in excercises,
 //! but is also intended for use in other purposes as well. If you have any issues or ideas, be sure to leave them
