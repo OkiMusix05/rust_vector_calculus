@@ -1,6 +1,24 @@
 #![feature(unboxed_closures, fn_traits)]
-//! # Vector Calculus for Rust
-//! [add description here]
+//! This crate is aimed to be an easy-to-use library for all calculations related to multivariable
+//! and vector calculus in Rust, and is able to compute a wide variety of operations numerically, doing so
+//! relatively fast. \
+//! To achieve this, it contains a growing number of macros designed to create different objects, functions
+//! and perform operations. For learning about all of these, you can go to the docs.rs page for this crate. \
+//! ## Learn
+//! The recommended order to learn the library is
+//! 1. [Vector] - Vectors
+//! 2. [Function] - Scalar functions
+//! 3. [VectorFunction] - Vector functions
+//! 4. [ParametricCurve], [Set], [Contour] - Contours
+//! 5. [ParametricSurface], [FSet], [Surface] - Surfaces
+//! 6. [integral!], [line_integral!], [surface_integral!] - Integrate everything!!
+//!
+//! As extras, also take into account [grad!], [curl!], [div!], derivatives like [ddx!] and [ddyv!], and lastly but
+//! not least important: the [setup!] macro.
+//! ## About the crate
+//! This crate was made by a 4th semester physics student to help verify the analytic results obtained in excercises,
+//! but is also intended for use in other purposes as well. If you have any issues or ideas, be sure to leave them
+//! in this crate's GitHub page: [https://github.com/OkiMusix05/rust_vector_calculus].
 use std::fmt::{Display, Formatter};
 use dyn_clone::DynClone;
 //use std::cmp::{min, max};
@@ -19,11 +37,11 @@ pub const Δ:f64 = 5e-6;
 /// # Universal gravitational constant
 /// The constant G has a value of 6.6743*10^-11
 /// \[G\] = m^3/kg*s^2
-pub const G:f64 = 6.6743e-11;
+const G:f64 = 6.6743e-11;
 /// # Speed of light in a vacuum
 /// The constant c has a value of 299,792,458
 /// \[c\] = m/s
-pub const C:f64 = 299_792_458.0;
+const C:f64 = 299_792_458.0;
 
 // ----- VECTORS -----
 #[doc(hidden)]
@@ -467,7 +485,7 @@ pub fn ddy_s(f:&Function, args:Vec<f64>) -> f64 {
 #[doc(hidden)]
 pub fn ddz_s(f:&Function, args:Vec<f64>) -> f64 {
     match f {
-        Function::OneD(f) => {
+        Function::OneD(_) => {
             panic!("Can't take partial with respect to z of a 1D function")
         }
         Function::TwoD(_) => {
@@ -1347,7 +1365,7 @@ impl Fn<(f64,)> for ParametricCurve {
 }
 /// Derivative for parametric curves
 /// # Derivative macro
-/// This macro is another option to the `sigma.ddt(f64)` method, and takes in a [ParametricCurve]
+/// This macro is another option to the `sigma.ddt(f64)` method, and takes in a [ParametricCurve] or a [Contour]
 /// and a f64, and returns the derivative vector on t0=f64.
 /// ## Examples
 /// ```
@@ -1496,7 +1514,8 @@ pub struct _Contour3D {
 /// due to these being intended for a [line_integral!]. \
 /// Contours also have a `.ddt(f64)` method (and the [ddt!] macro), a `.linspace()` and a `.bounds()` method, which returns a tuple
 /// with two f64 as the bounds. \
-/// These can be created with the [contour!] macro, and can also be evaluated as functions.
+/// These can be created with the [contour!] macro, and can also be evaluated as functions. \
+/// Lastly, contours have a `.len()` method which calculates the length of the curve given its bounds.
 /// ## Examples
 /// ```
 /// use vector_calculus::*;
@@ -1653,14 +1672,14 @@ impl Fn<(f64,)> for Contour {
 // The ddt macro also works for Contours
 
 // ----- LINE INTEGRAL -----
-/// Type of any variable
+/// Returns the type of any variable
 /// # Type of function
 /// Returns the type of any variable passed as reference, as a string
 /// ## Examples
 /// ```
 /// use vector_calculus::*;
 /// let u:Vector = vector!(0, 1, 0);
-/// assert_eq!(type_of(&u), "Vector".to_string());
+/// assert_eq!(type_of(&u), "Vector");
 /// ```
 pub fn type_of<T>(_: &T) -> &str {
     std::any::type_name::<T>().split("::").collect::<Vec<&str>>().last().unwrap()
@@ -1693,6 +1712,7 @@ macro_rules! _near {
         $a > $b - 2.*Δ && $a < $b + 2.*Δ
     };
 }
+#[doc(hidden)]
 pub fn near(a:__NV, b:__NV, e:f64) -> bool {
     match (a, b) {
         (__NV::Number(a), __NV::Number(b)) => {
@@ -2384,10 +2404,13 @@ pub fn categorize_integrals(f:&Function, args:Vec<__W>) -> f64 {
 /// set is the x bounds, the second the y bounds and the third the z bounds. \
 /// In this implementation, the order of the sets for the integration limits is the same as the definition
 /// of the variables. Can't be changed. \
-/// This means, that this macro encapsulates, single, double and triple integrals, but not [line_integral]s
+/// This means, that this macro encapsulates, single, double and triple integrals, but not [line_integral!]s
 /// nor [surface_integral!]s. \
 /// _Note_: It is customary that when the bounds of a variable are functions, you use the other variable as
 /// identifier in the FSet functions, as observed in the example with `x_bounds` and `y_bounds`. \
+/// _Note_: So you don't have to always write `MultipleIntegrationMethod::Simpson(0.05)`, for example, there's
+/// a macro called [setup!], that automatically brings into scope the [IntegrationMethod] and [MultipleIntegrationMethod]
+/// enums, so you can just write `Simpson(0.05)` instead.
 /// ## Examples
 /// ```
 /// use vector_calculus::*;
@@ -2411,7 +2434,7 @@ pub fn categorize_integrals(f:&Function, args:Vec<__W>) -> f64 {
 /// integral!(f1, bounds, method); // 1D function
 /// integral!(f2, x_bounds, y_bounds); // 2D function
 /// integral!(f2, x_bounds, y_bounds, multiple_method); // 2D function
-/// integral!(f3, x_bounds, y_bounds, z_bounds); // 3D function
+/// integral!(f3, x_bounds, y_bounds_const, z_bounds); // 3D function
 /// integral!(f3, x_bounds, y_bounds_const, z_bounds, multiple_method_3d); // 3D function
 /// ```
 #[macro_export]
@@ -2528,6 +2551,16 @@ impl<'s> Fn<(f64, f64)> for Surface<'s> {
         (self.f)(args.0, args.1)
     }
 }
+/// Creates a parametric surface
+/// # Parametric Surface macro
+/// This macro just takes as input two identifiers (the name of the variables) and three expressions, which
+/// will serve as the functions for each component in the 3D vector that it will return when evaluated,
+/// because this macro creates a [ParametricSurface].
+/// ## Examples
+/// ```
+/// use vector_calculus::*;
+/// let p:ParametricSurface = parametric_surface!(u, v, 3.*u*v, u+v, 9.);
+/// ```
 #[macro_export]
 macro_rules! parametric_surface {
     ($u:ident, $v:ident, $f1:expr, $f2:expr, $f3:expr) => {
@@ -2538,6 +2571,23 @@ macro_rules! parametric_surface {
             }
     };
 }
+/// Creates a surface
+/// # Surface macro
+/// This macro is used to initialize a [Surface], and there are multiple ways to call it
+/// 1. If all the bounds are constant, you can pass these as f64's.
+/// 2. If not all bounds are constant, or you prefer set notation you can do so using a [Set] or [FSet]
+/// 3. If you already have a parametric surface initialized previously and would like to turn it into a surface
+/// ## Examples
+/// ```
+/// use vector_calculus::*;
+/// // 1. Order of bounds: lower u, higher u, lower v, higher v
+/// let s1:Surface = surface!(u, v, u*v, u+v, u.powf(v), 0, 4, 0, 5);
+/// // 2. Order of bounds: limits for u, limits for v
+/// let s2:Surface = surface!(u, v, u*v, u+v, u.powf(v), set![0, 4], fset![f!(u, 0.), f!(u, 2.*u)]);
+/// // 3.
+/// let p:ParametricSurface = parametric_surface!(u, v, u*v, u+v, u.powf(v));
+/// let s3:Surface = surface!(p, set![0, 4], set![0,5]);
+/// ```
 #[macro_export]
 macro_rules! surface {
     ($u:ident, $v:ident, $f1:expr, $f2:expr, $f3:expr, $ui:expr, $uf:expr, $vi:expr, $vf:expr) => {
@@ -2572,6 +2622,7 @@ macro_rules! surface {
 }
 
 // ----- SURFACE INTEGRAL -----
+#[doc(hidden)]
 pub fn surface_integral(g:&__G, s:&Surface, m:MultipleIntegrationMethod) -> f64 {
     let s_clone = s.clone();
     let (u, v): (_SuperSet, _SuperSet) = (s_clone.u_lim, s_clone.v_lim);
@@ -2602,6 +2653,22 @@ pub fn surface_integral(g:&__G, s:&Surface, m:MultipleIntegrationMethod) -> f64 
         }
     }
 }
+/// Integrates a function (scalar or vector) over a surface
+/// # Surface Integral macro
+/// This macro is similar to the [line_integral!] macro because it works over scalar or vector functions,
+/// but is designed to integrate these over a [Surface]. \
+/// You can call this macro with a [Function] or [VectorFunction] and a [Surface], and optionally add in
+/// a variant from the [MultipleIntegrationMethod] enum. \
+/// By default, it uses the Monte Carlo method with 400, which means its fairly accurate, but it also will
+/// produce a slightly different result every time due to the randomness of the method.
+/// ## Examples
+/// ```
+/// use vector_calculus::*;
+/// setup!();
+/// let F:VectorFunction = vector_function!(x, y, z, x, y, z);
+/// let s:Surface = surface!(u, v, cos!(v)*sin!(u), sin!(v)*sin!(u), cos!(u), 0, PI/2., 0, 2.*PI);
+/// assert!(near!(surface_integral!(F, s), 2.*PI; 0.2)); // Near to a decimal point of 0.2
+/// ```
 #[macro_export]
 macro_rules! surface_integral {
     ($f:expr, $s:expr) => { surface_integral(&$f.wrap(), &$s, MultipleIntegrationMethod::MonteCarlo(400)) };
@@ -2609,6 +2676,19 @@ macro_rules! surface_integral {
 }
 
 // ----- CONFIG -----
+/// Initializes the Integration enums as well as pi and e
+/// # Setup macro
+/// This macro aids by automatically bringing into scope the [IntegrationMethod] and [MultipleIntegrationMethod]
+/// enum variants, so you can just write the variant when specifying a method on the [integral!], [line_integral!] or
+/// [surface_integral!] macros. This way, just write `Simpson13(100)` instead of `IntegrationMethod::Simpson13(100)`. \
+/// This macro also automatically imports the constants pi and e from the `std` library, so it's recommended to
+/// use it at the begging of the programs for simplicity.
+/// ## Examples
+/// ```
+/// use vector_calculus::*;
+/// setup!();
+/// assert!(near!(PI, 3.141592))
+/// ```
 #[macro_export]
 macro_rules! setup {
     () => {

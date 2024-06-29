@@ -40,3 +40,4 @@ IntegrationMethod and MultipleIntegrationMethod's variants, as well as pi and e.
 - v0.051 - Some restructuring, generalized the near! macro.
 - v0.052 - Fixed some things, created some documentation for docs.rs
 - v0.053 - More doc, fixed errors.
+- v0.1.0 - Finished the doc, fixed a lot of stuff, ready to publish!
